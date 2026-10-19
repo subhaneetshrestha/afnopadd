@@ -1,6 +1,6 @@
 # Spec: sheet-library
 
-Status: **DRAFT, pending owner approval** (2026-10-20). Module id `sheet-library`. Depends on: `sheet-document`. Package: `io.github.subhaneetshrestha.formchecker.library`. Project-wide rules in `SPEC.md` apply.
+Status: **APPROVED by the owner on 2026-10-20.** Module id `sheet-library`. Depends on: `sheet-document`. Package: `io.github.subhaneetshrestha.afnopadd.library`. Project-wide rules in `SPEC.md` apply.
 
 ## Objective
 
@@ -8,7 +8,7 @@ The first screen: start a new sheet, continue the last one, or open an older one
 
 ## Scope
 
-**In:** the menu screen; the library index database; thumbnail storage and refresh; last-opened tracking; rename, duplicate, delete with confirmation; sorting and search by title; empty state; the directory layout under `files/sheets/`.
+**In:** the menu screen; the library index database; thumbnail storage and refresh; last-opened tracking; rename, duplicate, delete with confirmation; sorting by recency (search by title is deferred past v1); empty state; the directory layout under `files/sheets/`.
 
 **Out:** rendering thumbnails (requested from `canvas-engine`'s `Renderer`), sharing actions (buttons delegate to `sharing`), navigation (`app-shell`).
 
@@ -53,7 +53,7 @@ interface SheetLibrary {
 4. Duplicating a 5,000-stroke sheet takes under 2 s and the copy opens identically.
 5. No sheet directory on disk is ever absent from the library after startup reconciliation.
 
-## Open questions
+## Decisions (owner, 2026-10-20)
 
-1. Trash retention: 7 days (proposal), or immediate delete with only the 10-second undo?
-2. Search by title in v1, or defer until users have many sheets?
+1. Deleted sheets stay in trash for 7 days, with the 10-second undo snackbar on top.
+2. Search by title is deferred until users have many sheets.

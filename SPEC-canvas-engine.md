@@ -1,6 +1,6 @@
 # Spec: canvas-engine
 
-Status: **DRAFT, pending owner approval** (2026-10-20). Module id `canvas-engine`. Depends on: `sheet-document`. Package: `io.github.subhaneetshrestha.formchecker.canvas`. Project-wide rules in `SPEC.md` apply.
+Status: **APPROVED by the owner on 2026-10-20.** Module id `canvas-engine`. Depends on: `sheet-document`. Package: `io.github.subhaneetshrestha.afnopadd.canvas`. Project-wide rules in `SPEC.md` apply.
 
 ## Objective
 
@@ -45,7 +45,7 @@ interface Renderer {
 6. **Spatial index** is an in-memory R-tree over world-space bounds rebuilt from the snapshot on open and updated incrementally by observing transactions.
 7. **Images** render from Coil 3 bitmaps requested at the power-of-two size that matches the bucket (Coil's size-keyed cache is the mip pyramid), drawn with bilinear filtering through the element's matrix, honouring crop and rotation. Pixelation at deep zoom is expected and documented.
 8. **Shapes** are drawn as `Path` with stroke width in frame units scaled through the matrix, anti-aliased, with arrowheads scaled to line width.
-9. **Gesture policy** is injected: the engine reports every pointer with its tool type; `drawing-tools` decides whether a finger draws or pans. Two-finger gestures always belong to the camera. Pointer cancellation (`ACTION_CANCEL`, `FLAG_CANCELED`) cancels the wet stroke.
+9. **Gesture policy** is injected: the engine reports every pointer with its tool type; `drawing-tools` decides whether a single finger draws or pans, and its hand tool pans with any single pointer. Two-pointer gestures (pinch zoom around the focal point, two-finger pan) always belong to the camera in every tool. Pointer cancellation (`ACTION_CANCEL`, `FLAG_CANCELED`) cancels the wet stroke. Two-finger rotate is not in v1.
 10. **Backgrounds**: plain, 5 mm grid, dots; drawn in screen space at the current bucket so they do not alias.
 
 ## Testing
@@ -64,8 +64,8 @@ interface Renderer {
 5. `renderBitmap` output of the whole sheet at 4x matches on-screen rendering for the same region (pixel diff under 1 percent).
 6. No public API references tool or file concepts.
 
-## Open questions
+## Decisions (owner, 2026-10-20)
 
-1. Compose's pointer API may not expose stylus tilt; if not, the engine uses Ink's own input path or `pointerInteropFilter` for the drawing surface. Decide during planning after a spike.
-2. Two-finger rotate: off by default; include at all in v1?
-3. Is a 96 MB tile budget right for low-memory phones, or should it scale with `ActivityManager.memoryClass`? Proposal: 10 percent of memory class, floor 48 MB, cap 128 MB.
+1. Stylus tilt access is settled by a spike in the planning phase: Compose pointer API if it exposes tilt, otherwise Ink's own input path or `pointerInteropFilter` on the drawing surface.
+2. Two-finger rotate is excluded from v1.
+3. The tile budget scales with `ActivityManager.memoryClass`: 10 percent of it, floor 48 MB, cap 128 MB.

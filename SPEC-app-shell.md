@@ -1,6 +1,6 @@
 # Spec: app-shell
 
-Status: **DRAFT, pending owner approval** (2026-10-20). Module id `app-shell`. Depends on: `sheet-library`, `drawing-tools`, `image-board`, `sharing`. Package: `io.github.subhaneetshrestha.formchecker.shell`. Project-wide rules in `SPEC.md` apply.
+Status: **APPROVED by the owner on 2026-10-20.** Module id `app-shell`. Depends on: `sheet-library`, `drawing-tools`, `image-board`, `sharing`. Package: `io.github.subhaneetshrestha.afnopadd.shell`. Project-wide rules in `SPEC.md` apply.
 
 ## Objective
 
@@ -43,7 +43,8 @@ data class Settings(val fingerMode: FingerMode = FingerMode.AUTO, val toolbarPla
 3. Every screen has a Compose preview and renders correctly in light and dark theme.
 4. The navigation skeleton (library and editor placeholders) is the first commit of implementation.
 
-## Open questions
+## Decisions (owner, 2026-10-20)
 
-1. Brand colour and app icon: keep the placeholder green check until a designer pass, or decide now?
-2. Should settings include a left-handed mode in v1 (toolbar on the other side)? Proposal: yes, it is one flag.
+1. The placeholder green-check icon and colour stay until a design pass; a real icon is a release blocker listed in `SPEC.md`.
+2. Left-handed mode (mirrored toolbar) is a v1 setting.
+3. Finger mode AUTO as described in decision 4; the hand tool from `drawing-tools` is always available in addition.

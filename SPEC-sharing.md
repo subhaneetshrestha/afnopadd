@@ -1,6 +1,6 @@
 # Spec: sharing
 
-Status: **DRAFT, pending owner approval** (2026-10-20). Module id `sharing`. Depends on: `sheet-document`, `canvas-engine`, `sheet-library`. Package: `io.github.subhaneetshrestha.formchecker.sharing`. Project-wide rules in `SPEC.md` apply.
+Status: **APPROVED by the owner on 2026-10-20.** Module id `sharing`. Depends on: `sheet-document`, `canvas-engine`, `sheet-library`. Package: `io.github.subhaneetshrestha.afnopadd.sharing`. Project-wide rules in `SPEC.md` apply.
 
 ## Objective
 
@@ -21,7 +21,7 @@ data class PdfExportOptions(val region: ExportRegion, val background: Background
 interface Exporter {
     suspend fun exportImage(sheet: Sheet, camera: Camera, options: ImageExportOptions): File     // in cache/exports/
     suspend fun exportPdf(sheet: Sheet, camera: Camera, options: PdfExportOptions): File
-    suspend fun exportPackage(sheet: Sheet): File                                               // <title>.fcsheet
+    suspend fun exportPackage(sheet: Sheet): File                                               // <title>.afnopadd
 }
 interface ShareLauncher { fun share(file: File, mime: String, title: String); fun saveAs(file: File, mime: String, suggestedName: String) }
 interface PackageReceiver { suspend fun inspect(uri: Uri): PackagePreview?; suspend fun import(uri: Uri): ImportResult }   // Ok(SheetSummary) | Error(reason)
@@ -34,8 +34,8 @@ Commands: `cmd:export-image`, `cmd:export-pdf`, `cmd:share-sheet`, `cmd:save-she
 1. **Image export** renders through `canvas-engine.Renderer.renderBitmap` on a software canvas (hardware canvases throw above about 100 MB). Scale options: 1x, 2x, 4x, or a target long edge; the output is capped at 100 megapixels with a message that suggests PDF or a smaller region. Background: white, sheet background, or transparent (PNG only). Files go to `cache/exports/` and are cleaned after 24 hours.
 2. **PDF export** uses `android.graphics.pdf.PdfDocument`: one page sized to the region at 72 points per 1 world unit up to the PDF page limit of 14,400 points per side; larger regions are tiled into multiple pages with 1 cm overlap. Strokes and shapes are drawn through `Renderer.renderTo`, which falls back to Ink's path renderer on the PDF canvas, so they stay vector; images are embedded at their stored resolution.
 3. **Sharing** uses `FileProvider` content URIs with `FLAG_GRANT_READ_URI_PERMISSION`, `ACTION_SEND`, and `Intent.createChooser`; "Save to…" uses `CreateDocument` so Drive, Nextcloud, and local folders all work without their APIs. Quick Share appears automatically in the Sharesheet.
-4. **Package send** calls `sheet-document.exportPackage` after `flush()`, names the file `<title>.fcsheet`, MIME `application/vnd.formchecker.sheet+zip`.
-5. **Receiving.** Manifest intent filters on `MainActivity` (or a lightweight `ImportActivity`): `ACTION_VIEW` with `content` and `file` schemes for the custom MIME, for `application/zip`, for `application/octet-stream`, and for `*/*` with path pattern `.*\.fcsheet`; `ACTION_SEND` for the same MIME types. Every incoming stream is sniffed for the `mimetype` ZIP entry before anything else happens; non-matching files are rejected with a message.
+4. **Package send** calls `sheet-document.exportPackage` after `flush()`, names the file `<title>.afnopadd`, MIME `application/vnd.afnopadd.sheet+zip`.
+5. **Receiving.** Manifest intent filters on `MainActivity` (or a lightweight `ImportActivity`): `ACTION_VIEW` with `content` and `file` schemes for the custom MIME, for `application/zip`, for `application/octet-stream`, and for `*/*` with path pattern `.*\.afnopadd`; `ACTION_SEND` for the same MIME types. Every incoming stream is sniffed for the `mimetype` ZIP entry before anything else happens; non-matching files are rejected with a message.
 6. **Import flow.** Show a preview (title, element count, embedded thumbnail if present, sender app if known) with "Import" and "Cancel". Import always creates a new sheet via `sheet-document.importPackage` and registers it in the library; if a sheet with the same `origin.sheetId` already exists the dialog says so and offers "Import as copy" (default) or "Cancel". No merge in v1. On success the editor opens the new sheet.
 7. **Privacy.** Exports contain only sheet content; packages carry no device identifiers; the app version string is the only metadata beyond the sheet's own.
 
@@ -52,8 +52,8 @@ Commands: `cmd:export-image`, `cmd:export-pdf`, `cmd:share-sheet`, `cmd:save-she
 3. A renamed or stripped package (`.zip`, no name, `application/octet-stream`) still imports; a random ZIP is rejected with a specific message.
 4. No `INTERNET` permission; no file leaves the device without a user action.
 
-## Open questions
+## Decisions (owner, 2026-10-20)
 
-1. Should "Share" default to the package or to a PNG? Proposal: the share menu shows both, package first.
-2. JPEG export: include (smaller files for photos) or PNG only?
-3. Should the import dialog offer "Open without importing" (read-only preview)? Proposal: no in v1.
+1. The share menu offers both the package and an image export, package first.
+2. JPEG export (quality 90) is included alongside PNG; PDF is the vector option.
+3. No read-only "open without importing" in v1.

@@ -1,6 +1,6 @@
 # Spec: sheet-document
 
-Status: **DRAFT, pending owner approval** (2026-10-20). Module id `sheet-document` in `CAPABILITY-MAP.md`. Depends on: nothing. Package: `io.github.subhaneetshrestha.formchecker.document`. Project-wide rules in `SPEC.md` apply.
+Status: **APPROVED by the owner on 2026-10-20.** Module id `sheet-document` in `CAPABILITY-MAP.md`. Depends on: nothing. Package: `io.github.subhaneetshrestha.afnopadd.document`. Project-wide rules in `SPEC.md` apply.
 
 ## Objective
 
@@ -8,7 +8,7 @@ The single source of truth for a sheet's content and its persistence. Everything
 
 ## Scope
 
-**In:** element model; IDs and z-order; coordinate conventions (world units, anchors, frame levels); styles; transaction and diff model; undo/redo stack; Room persistence with autosave; content-addressed asset store; schema versioning and migrations; package format (`.fcsheet`) export and import; sheet metadata (title, timestamps, origin).
+**In:** element model; IDs and z-order; coordinate conventions (world units, anchors, frame levels); styles; transaction and diff model; undo/redo stack; Room persistence with autosave; content-addressed asset store; schema versioning and migrations; package format (`.afnopadd`) export and import; sheet metadata (title, timestamps, origin).
 
 **Out:** rendering and spatial indexing (`canvas-engine`), any UI, the library index of all sheets (`sheet-library`), intents and share flows (`sharing`), thumbnails (rendered by `canvas-engine`, stored by `sheet-library`).
 
@@ -65,14 +65,14 @@ interface SheetStore {
 5. **SQLite per sheet, Room 2.8.5 with `BundledSQLiteDriver`.** Each sheet is a directory `files/sheets/<ulid>/` containing `sheet.db` (WAL mode), `assets/`, and later `thumb.webp`. Tables: `meta(key, value)` including `schema_version`, `sheet_id`, `title`, `origin_json`; `element(id, kind, z, anchor_x, anchor_y, frame_level, bounds_l, bounds_t, bounds_r, bounds_b, version, version_nonce, deleted, created_at, updated_at, payload_json)`; `stroke_points(element_id, format_version, blob)`; `asset(id, mime, width, height, byte_size, created_at)`; `op(seq, txn_id, kind, element_id, before_json, after_json, created_at, undo_of)`. Room schema JSON is exported to `app/schemas/` and committed. Writes run on one single-threaded dispatcher per sheet; `flush()` awaits the queue.
 6. **Autosave is the transaction.** Each finished gesture is one transaction and one commit; there is no timer. Deleted elements keep a tombstone row for one session, then `close()` compacts ops older than the last 1,000 and purges tombstones.
 7. **Assets are content-addressed.** `put` streams to a temp file while hashing, then renames to `assets/<sha256>`; duplicates cost nothing. `collectGarbage` deletes files no live element references and runs on `close()`.
-8. **Package format v1 (`.fcsheet`)** is a ZIP whose first entry is an uncompressed file named `mimetype` containing `application/vnd.formchecker.sheet+zip` (the EPUB/ODF trick, so receivers can sniff the file even when the sender stripped its name). Then `manifest.json` (`formatVersion`, app name and version, `sheet{id, title, createdAt, updatedAt}`, `elements[]` with payloads, `assets[]`), `strokes/<elementId>.bin`, `assets/<sha256>`, optional `thumbnail.webp`. Deleted elements are not exported. Import creates a **new** sheet ULID (a fork) but keeps element IDs, records `origin{sheetId, exportedAt, app}` in `meta`, verifies every asset hash, and refuses files whose `formatVersion` is newer than the app supports with a clear error. Format versions are migrated by pure `JsonObject -> JsonObject` functions before typed decoding; the format document lives in `docs/format/fcsheet-v1.md` and is frozen at the first sharing release.
+8. **Package format v1 (`.afnopadd`)** is a ZIP whose first entry is an uncompressed file named `mimetype` containing `application/vnd.afnopadd.sheet+zip` (the EPUB/ODF trick, so receivers can sniff the file even when the sender stripped its name). Then `manifest.json` (`formatVersion`, app name and version, `sheet{id, title, createdAt, updatedAt}`, `elements[]` with payloads, `assets[]`), `strokes/<elementId>.bin`, `assets/<sha256>`, optional `thumbnail.webp`. Deleted elements are not exported. Import creates a **new** sheet ULID (a fork) but keeps element IDs, records `origin{sheetId, exportedAt, app}` in `meta`, verifies every asset hash, and refuses files whose `formatVersion` is newer than the app supports with a clear error. Format versions are migrated by pure `JsonObject -> JsonObject` functions before typed decoding; the format document lives in `docs/format/afnopadd-v1.md` and is frozen at the first sharing release.
 9. **Forward tolerance.** All JSON decoding uses `ignoreUnknownKeys = true`; unknown element kinds are preserved as `UnknownElement(rawJson)` in memory and written back unchanged, so an older app can round-trip a newer file without destroying data.
 
 ## Testing
 
 - JVM unit tests: fractional index properties (ordering, insert-between never collides for 10,000 random inserts); ULID monotonicity; transaction diff correctness; undo/redo round trips; frame-level math; `StrokePoints` encode/decode including NaN-free guarantees.
 - Room tests with `BundledSQLiteDriver` on the JVM (fallback: `androidTest`): create, write 5,000 strokes, reopen, compare; migration tests for every schema version using the exported schema JSON; crash simulation by killing the writer mid-transaction and reopening.
-- Golden files: `app/src/test/resources/packages/v1/*.fcsheet` built once and never regenerated silently; import must produce the expected snapshot, and export of that snapshot must re-import equal.
+- Golden files: `app/src/test/resources/packages/v1/*.afnopadd` built once and never regenerated silently; import must produce the expected snapshot, and export of that snapshot must re-import equal.
 - Fuzz: truncated or corrupted packages produce `ImportResult.Error`, never an exception or a half-imported sheet directory.
 
 ## Success criteria
@@ -85,8 +85,8 @@ interface SheetStore {
 6. No public API of this package references Android UI, Compose, or Ink types.
 7. 80 percent line coverage on the package.
 
-## Open questions
+## Decisions (owner, 2026-10-20)
 
-1. Confirm storing points in our own format rather than Ink's protobuf (decision 3). It costs Ink's delta compression; ZIP deflate recovers most of it.
-2. Should ops older than 1,000 be compacted on close (decision 6), or kept forever to allow a future "history" feature? Compaction is the proposal.
-3. Should `NoteElement` be removed entirely from v1 instead of reserved? Reserving it costs one sealed subtype and no UI.
+1. Points are stored in Afnopadd's own packed format, not Ink's protobuf (decision 3); ZIP deflate recovers most of the compression.
+2. Ops older than 1,000 are compacted on close (decision 6).
+3. `NoteElement` stays reserved with no UI in v1.

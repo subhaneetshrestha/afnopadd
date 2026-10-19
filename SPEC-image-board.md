@@ -1,6 +1,6 @@
 # Spec: image-board
 
-Status: **DRAFT, pending owner approval** (2026-10-20). Module id `image-board`. Depends on: `canvas-engine`, `sheet-document`, `drawing-tools`. Package: `io.github.subhaneetshrestha.formchecker.images`. Project-wide rules in `SPEC.md` apply.
+Status: **APPROVED by the owner on 2026-10-20.** Module id `image-board`. Depends on: `canvas-engine`, `sheet-document`, `drawing-tools`. Package: `io.github.subhaneetshrestha.afnopadd.images`. Project-wide rules in `SPEC.md` apply.
 
 ## Objective
 
@@ -23,7 +23,7 @@ sealed interface ImageSource { data object PhotoPicker : ImageSource; data objec
 data class Placement(val center: WorldPoint, val frameLevel: Int, val maxSizeFraction: Float = 0.6f)
 ```
 
-Image-specific commands registered with `CommandRegistry`: `cmd:image-import`, `cmd:image-crop`, `cmd:image-reset-crop`, `cmd:arrange-row`, `cmd:arrange-grid`.
+Image-specific commands registered with `CommandRegistry`: `cmd:image-import`, `cmd:image-crop`, `cmd:image-reset-crop`, `cmd:arrange-row` (`cmd:arrange-grid` is deferred past v1).
 
 ## Design decisions
 
@@ -49,8 +49,8 @@ Image-specific commands registered with `CommandRegistry`: `cmd:image-import`, `
 4. Images can be moved, scaled, rotated, cropped, reordered, duplicated, and deleted, each as one undoable gesture.
 5. No image-related permission appears in the manifest.
 
-## Open questions
+## Decisions (owner, 2026-10-20)
 
-1. Keep the original file as a second asset for lossless export (larger sheets), or store only the normalised copy (proposal)?
-2. Maximum stored edge: 4,096 px (proposal) or 8,192 px for tablets with more memory?
-3. Should "arrange in grid" exist in v1 or wait for user demand?
+1. Only the normalised copy is stored; the original file is not kept.
+2. Maximum stored long edge is 4,096 px.
+3. "Arrange in row" ships in v1; "arrange in grid" waits for user demand.

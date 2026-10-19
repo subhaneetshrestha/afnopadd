@@ -1,11 +1,11 @@
-# Spec: Form Checker (working title)
+# Spec: Afnopadd
 
-Status: **DRAFT, pending owner approval** (2026-10-20).
+Status: **APPROVED by the owner on 2026-10-20** (decisions recorded at the end of this document).
 This is the project-wide spec. Each capability module in `CAPABILITY-MAP.md` has its own `SPEC-<module>.md` that inherits everything here and adds module scope, contracts, and success criteria. Research behind the decisions: `docs/research/2026-10-20-infinite-canvas-research.md`.
 
 ## Objective
 
-**What:** an open-source Android app for drawing and arranging on an unbounded vector canvas called a *sheet*. Pen, pencil, and brush strokes with pressure; lines and geometric shapes; imported images arranged like a sticky board; very deep zoom with no loss of quality; sheets saved locally, shareable as files.
+**What:** Afnopadd is an open-source Android app for drawing and arranging on an unbounded vector canvas called a *sheet*. Pen, pencil, and brush strokes with pressure; lines and geometric shapes; imported images arranged like a sticky board; very deep zoom with no loss of quality; sheets saved locally, shareable as files.
 
 **Why:** a Concepts-style infinite vector canvas that is free software, works fully offline, and can later be reshaped by its users through JSON tool layouts, custom tools, and plugins.
 
@@ -17,12 +17,12 @@ This is the project-wide spec. Each capability module in `CAPABILITY-MAP.md` has
 2. I draw with pen, pencil, or brush, choosing colour, brush type, and thickness; strokes respond to pressure on capable devices.
 3. I draw straight lines, rectangles, ellipses, and arrows.
 4. I import photos and arrange them like sticky notes: move, scale, rotate, crop, reorder.
-5. I zoom in as far as I like and keep drawing finer detail; nothing I drew blurs.
+5. I zoom in as far as I like and keep drawing finer detail; nothing I drew blurs. I can pinch to zoom in any tool, and a hand tool lets me pan and pinch-zoom without drawing.
 6. I undo and redo any change.
 7. The app saves as I go; a crash loses at most the stroke I was making.
-8. I export a sheet as PNG or PDF, send the sheet file to someone, and open a sheet file someone sent me; each of us then edits our own copy.
+8. I export a sheet as PNG, JPEG, or PDF, send the sheet file to someone, and open a sheet file someone sent me; each of us then edits our own copy.
 
-**Non-goals for v1:** cloud links, sync, real-time collaboration, accounts, any network access, raster painting brushes, pages, text notes (reserved in the data model, no UI), handwriting recognition, layers (open question 3).
+**Non-goals for v1:** cloud links, sync, real-time collaboration, accounts, any network access, raster painting brushes, pages, layers, text notes (reserved in the data model, no UI), handwriting recognition.
 
 ## Tech stack (versions verified 2026-10-20)
 
@@ -40,9 +40,10 @@ This is the project-wide spec. Each capability module in `CAPABILITY-MAP.md` has
 | Settings | DataStore Preferences | 1.2.1 |
 | Tests | JUnit 4, kotlinx-coroutines-test, AndroidX test, Compose UI test | see Testing |
 | Licence | GPL-3.0-or-later (`LICENSE`) | |
-| Application ID | `io.github.subhaneetshrestha.formchecker` (permanent) | |
+| Application ID | `io.github.subhaneetshrestha.afnopadd` (permanent) | |
+| Source | https://github.com/subhaneetshrestha/afnopadd | |
 
-Dependencies outside AndroidX/Google that need the owner's approval under the boundaries below: kotlinx.serialization (JetBrains), kotlinx-coroutines-test (JetBrains), JUnit 4, Coil 3. Later phases add quickjs-kt and a JSON Schema validator; those get their own approval when scheduled.
+Dependencies outside AndroidX/Google approved by the owner on 2026-10-20: kotlinx.serialization (JetBrains), kotlinx-coroutines-test (JetBrains), JUnit 4, Coil 3. Later phases add quickjs-kt and possibly a JSON Schema validator; those get their own approval when scheduled.
 
 ## Commands
 
@@ -55,7 +56,7 @@ Run from the project root in PowerShell. The wrapper finds Java on PATH (mise-ma
 .\gradlew.bat check                              # lint + unit tests (the pre-commit gate)
 .\gradlew.bat connectedDebugAndroidTest          # Instrumented tests on a connected device/emulator
 .\gradlew.bat installDebug                       # Install on the connected device
-adb shell am start -n io.github.subhaneetshrestha.formchecker/.MainActivity
+adb shell am start -n io.github.subhaneetshrestha.afnopadd/.MainActivity
 .\gradlew.bat assembleRelease                    # Unsigned release build (F-Droid builds and signs from source)
 .\gradlew.bat :app:dependencies --configuration debugRuntimeClasspath   # Audit what ships
 ```
@@ -63,13 +64,13 @@ adb shell am start -n io.github.subhaneetshrestha.formchecker/.MainActivity
 ## Project structure
 
 ```
-app/src/main/java/io/github/subhaneetshrestha/formchecker/
+app/src/main/java/io/github/subhaneetshrestha/afnopadd/
   document/     sheet-document: element model, transactions, Room persistence, package format
   canvas/       canvas-engine: camera, rendering, Ink integration, tiles, hit-testing
   tools/        drawing-tools: tool registry, tool state machines, toolbar, presets, colours
   images/       image-board: import pipeline, image transforms, sticky-board helpers
   library/      sheet-library: menu screen, library index, thumbnails
-  sharing/      sharing: PNG/PDF export, package send/receive
+  sharing/      sharing: PNG/JPEG/PDF export, package send/receive
   shell/        app-shell: MainActivity, navigation, theme, dependency wiring, settings
   toolconfig/   tool-config (later phase)
   plugins/      plugins (later phase)
@@ -82,18 +83,19 @@ app/schemas/                      Room schema history (committed, never edited b
 docs/research/                    Research notes
 docs/adr/                         Architecture decision records (NNNN-title.md)
 docs/format/                      The sheet package format, versioned (public contract once sharing ships)
+docs/checklists/                  Manual release checklist
 tasks/                            plan.md and todo.md produced by the planning phase
 CAPABILITY-MAP.md, SPEC.md, SPEC-<module>.md
 ```
 
-Each capability package exposes a small public API (interfaces and data types in the package root) and keeps implementation in an `internal` sub-package. Dependencies between packages follow the capability map's arrows only; Lint's `InvalidPackage`-style check is not available for this, so reviews enforce it.
+Each capability package exposes a small public API (interfaces and data types in the package root) and keeps implementation in an `internal` sub-package. Dependencies between packages follow the capability map's arrows only; reviews enforce it.
 
 ## Code style
 
 Kotlin official style (`kotlin.code.style=official`), 4-space indent, 120-column lines, trailing commas on multi-line declarations and calls. Immutable data by default; UI state is hoisted; Compose composables take state and lambdas, never repositories.
 
 ```kotlin
-package io.github.subhaneetshrestha.formchecker.document
+package io.github.subhaneetshrestha.afnopadd.document
 
 /** World-space point in sheet units (1 unit = 1 dp at zoom 1.0). Double because sheets are deep. */
 data class WorldPoint(val x: Double, val y: Double)
@@ -174,31 +176,39 @@ Rules: a bug fix starts with a failing test that reproduces it. Pure logic (docu
 
 ## Success criteria (v1, whole app)
 
-Measured on the reference devices in open question 4 unless stated.
+Measured on the reference devices (an API 29+ phone and a stylus tablet on API 34+) unless stated.
 
 1. Cold start to the library screen in under 1 second; opening a sheet with 5,000 strokes (about 150 points each) in under 1.5 seconds to first interactive frame.
 2. A wet stroke appears within the next display frame on API 29+ (front-buffer path); drawing a 1,000-point stroke on a 5,000-stroke sheet drops no frames.
 3. Pan and zoom at 60 frames per second on a sheet with 5,000 strokes and 20 images at any zoom level.
-4. Total zoom range of at least 1e8 (for example 0.001x to 100,000x) with crisp stroke edges and stable relative positions at every level.
+4. Total zoom range of at least 1e8 (0.001x to 100,000x) with crisp stroke edges and stable relative positions at every level.
 5. Killing the process mid-stroke loses only that stroke; reopening shows everything else.
 6. Export then import of a package yields the same element set (IDs, geometry, styles) and byte-identical assets.
-7. Every v1 tool works with finger and stylus; pressure changes pen width on pressure-capable hardware.
+7. Every v1 tool works with finger and stylus; pressure changes pen width on pressure-capable hardware; pinch zoom works in every tool and the hand tool pans with one pointer.
 8. The release build requests no `INTERNET` permission and passes an F-Droid anti-feature review (no NonFreeDep, no Tracking).
 9. Pure-logic packages reach 80 percent line coverage; all tests pass on an API 29 and an API 34+ device.
 
 ## Release blockers (before the first F-Droid build)
 
-- Application ID set to `io.github.subhaneetshrestha.formchecker` (done 2026-10-20).
+- Application ID `io.github.subhaneetshrestha.afnopadd` (done 2026-10-20).
 - `LICENSE` is GPL-3.0-or-later (done); add SPDX headers if the owner wants them.
+- Real app icon and brand colour (placeholder green check until a design pass).
 - Fastlane metadata in `metadata/en-US/` (short and full description, screenshots, changelog).
 - Reproducible build check from a clean clone; no signing material in the repository.
 - Sheet package format v1 frozen and documented in `docs/format/`.
 
+## Decisions recorded at approval (owner, 2026-10-20)
+
+1. Third-party dependencies kotlinx.serialization, kotlinx-coroutines-test, JUnit 4, and Coil 3 are approved.
+2. The app is named **Afnopadd**. Launcher label "Afnopadd"; sheet files use the `.afnopadd` extension and MIME type `application/vnd.afnopadd.sheet+zip`; application ID `io.github.subhaneetshrestha.afnopadd`; repository `subhaneetshrestha/afnopadd`.
+3. No layers in v1; z-order only. The element model leaves room for a `layerId` later.
+4. Reference devices: an API 29+ phone and a stylus tablet on API 34+.
+5. Finger behaviour: fingers draw until a stylus is first seen on the device, then fingers pan and zoom; a setting overrides either way. In addition, a **hand tool** (`tool:hand`) is always in the toolbar: one pointer pans, two pinch-zoom. Pinch zoom works in every tool.
+6. Zoom range 0.001x to 100,000x.
+7. Stroke points are stored in Afnopadd's own compact format, not Ink's protobuf.
+8. Imported photos are normalised to at most 4,096 px on the long edge; the original file is not kept.
+9. Module-level proposals in each `SPEC-<module>.md` are adopted as written and recorded in their Decisions sections.
+
 ## Open questions
 
-1. Is "Form Checker" the final app name, or a working title? It appears in the launcher, the file extension (`.fcsheet`), and the MIME type (`application/vnd.formchecker.sheet+zip`).
-2. Approve the third-party dependencies listed under Tech stack (kotlinx.serialization, kotlinx-coroutines-test, JUnit 4, Coil 3)?
-3. Layers: v1 proposes a single z-ordered list with no layers; the element model leaves room for a `layerId` later. Agree?
-4. Which devices do you own for testing? The spec assumes one API 29+ phone and one stylus tablet on API 34+.
-5. Finger behaviour: proposal is "finger draws" until a stylus is first seen on the device, after which fingers pan and zoom; a setting overrides either way.
-6. Zoom cap: proposal 0.001x to 100,000x. Is a larger range wanted?
+None outstanding at approval. New questions go into the relevant module spec and are raised in the planning phase.

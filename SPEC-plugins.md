@@ -1,6 +1,6 @@
 # Spec: plugins (later phase, outline)
 
-Status: **OUTLINE, pending owner approval** (2026-10-20). Module id `plugins`. Depends on: `tool-config`, `drawing-tools`. Package: `io.github.subhaneetshrestha.formchecker.plugins`. Project-wide rules in `SPEC.md` apply. A full spec is written when the phase is scheduled; this outline fixes the direction so earlier modules do not close it off.
+Status: **OUTLINE, direction approved by the owner on 2026-10-20.** Module id `plugins`. Depends on: `tool-config`, `drawing-tools`. Package: `io.github.subhaneetshrestha.afnopadd.plugins`. Project-wide rules in `SPEC.md` apply. A full spec is written when the phase is scheduled; this outline fixes the direction so earlier modules do not close it off.
 
 ## Objective
 
