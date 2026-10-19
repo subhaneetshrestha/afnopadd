@@ -4,14 +4,14 @@ plugins {
 }
 
 android {
-    namespace = "io.github.subhaneetshrestha.formchecker"
+    namespace = "io.github.subhaneetshrestha.afnopadd"
     // Android 17 ships as minor platform releases (37.0, 37.1, 37.2); together these select platforms;android-37.2.
     compileSdk = 37
     compileSdkMinor = 2
 
     defaultConfig {
         // Permanent: F-Droid identifies the app by this ID and users lose data if it changes.
-        applicationId = "io.github.subhaneetshrestha.formchecker"
+        applicationId = "io.github.subhaneetshrestha.afnopadd"
         // Android 10: every supported device gets Jetpack Ink's low-latency front-buffer inking.
         minSdk = 29
         targetSdk = 37
