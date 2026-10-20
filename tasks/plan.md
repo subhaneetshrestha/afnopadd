@@ -46,7 +46,8 @@ T1 build plumbing ─┬─ T2 app shell skeleton ──────────
 
 - [x] Task 7: Camera model and canvas math (2026-10-20)
 - [x] Task 8: SheetCanvas composable with pan, pinch, background (2026-10-20)
-- [ ] Task 9: Ink wet strokes (InProgressStrokes) with frame transform
+- [x] Task 9: Ink wet strokes (InProgressStrokesView) with frame transform (2026-10-20)
+- [ ] Task 9b: Stylus tilt and motion prediction through MotionEvent interop (added 2026-10-20; before Checkpoint C)
 - [ ] Task 10: Dry stroke rendering with same-frame handoff
 - [ ] Task 11: Pen tool, registries, JSON toolbar, editor wiring
 

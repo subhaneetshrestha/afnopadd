@@ -228,22 +228,48 @@ Done 2026-10-20. Dirty-region invalidation is deferred to the tile cache (Task 2
 **Description:** Integrate Jetpack Ink's `InProgressStrokes` into `SheetCanvas`: feed it the inverse frame-to-screen transform for the current frame level, enable motion prediction, honour pointer cancellation, and hand finished strokes to the sink as `FinishedStroke` (inputs in frame units plus the frame level and anchor). Begin with a spike on stylus tilt availability through Compose and record the outcome in an ADR.
 
 **Acceptance criteria:**
-- [ ] Drawing with finger or stylus shows a wet stroke that follows the pointer; `ACTION_CANCEL` removes it without a `FinishedStroke`.
-- [ ] `FinishedStroke` carries inputs whose coordinates are in frame units consistent with `CanvasMath` for the camera at stroke start.
-- [ ] `docs/adr/0002-stylus-input-path.md` records whether Compose exposes tilt and which input path was chosen.
+- [x] Drawing with finger or stylus shows a wet stroke that follows the pointer; `ACTION_CANCEL` removes it without a `FinishedStroke` (Compose delivers cancel as a pre-consumed release; handled).
+- [x] `FinishedStroke` carries inputs whose coordinates are in frame units consistent with `CanvasMath` for the camera at stroke start.
+- [x] `docs/adr/0002-stylus-input-path.md` records whether Compose exposes tilt and which input path was chosen.
 
 **Verification:**
-- [ ] Tests pass: instrumented test injecting a synthetic stroke and asserting the `FinishedStroke` contents
-- [ ] Build succeeds: `.\gradlew.bat assembleDebug`
-- [ ] Manual check: stroke feel with stylus and finger on both reference devices
+- [x] Tests pass: `WetStrokeTest` (four instrumented tests) on the API 36 emulator
+- [x] Build succeeds: `.\gradlew.bat assembleDebug`
+- [x] Manual check: stroke feel with stylus and finger on both reference devices, part of the owner's Checkpoint B review
 
 **Dependencies:** Task 8
 
 **Files likely touched:**
-- `canvas/internal/WetStrokes.kt`, `canvas/FinishedStroke.kt`, `canvas/SheetCanvas.kt`
+- `canvas/internal/WetStrokeRouter.kt`, `canvas/internal/InkBridge.kt`, `canvas/CanvasInput.kt`, `canvas/SheetCanvas.kt`
 - `docs/adr/0002-stylus-input-path.md`
 
 **Estimated scope:** Medium
+
+Done 2026-10-20. Ink is driven through `InProgressStrokesView`'s `StrokeInput` API from the Compose gesture handler, so pinch and finger policy stay in one place. Deviations from the spec recorded in ADR 0002 and picked up by Task 9b: strokes carry pressure but not tilt, and motion prediction is not wired yet.
+
+---
+
+## Task 9b: Stylus tilt and motion prediction through MotionEvent interop
+
+**Description:** Close the two gaps left by Task 9: read `AXIS_TILT` and `AXIS_ORIENTATION` from raw `MotionEvent`s with a `pointerInteropFilter` placed next to the gesture modifier and attach them to stroke inputs, and feed the same events to `androidx.input.motionprediction.MotionEventPredictor` so each `addToStroke` call carries a prediction batch.
+
+**Acceptance criteria:**
+- [ ] On a stylus device (or an injected stylus `MotionEvent` with tilt), finished strokes carry non-zero tilt and orientation that match the injected values.
+- [ ] `addToStroke` receives a non-empty prediction batch on devices where the predictor produces one; finger-mode and pinch behaviour from Task 8 are unchanged.
+- [ ] ADR 0002 is updated to "follow-ups done".
+
+**Verification:**
+- [ ] Tests pass: instrumented test injecting stylus events with tilt; existing canvas tests still pass
+- [ ] Build succeeds: `.\gradlew.bat assembleDebug`
+- [ ] Manual check: stroke latency with and without prediction on the stylus tablet
+
+**Dependencies:** Task 9
+
+**Files likely touched:**
+- `canvas/internal/CanvasGestures.kt`, `canvas/internal/WetStrokeRouter.kt`, `canvas/internal/InkBridge.kt`
+- `docs/adr/0002-stylus-input-path.md`
+
+**Estimated scope:** Small
 
 ---
 

@@ -1,5 +1,8 @@
 package io.github.subhaneetshrestha.afnopadd.canvas
 
+import androidx.ink.strokes.Stroke
+import io.github.subhaneetshrestha.afnopadd.document.BrushSpec
+import io.github.subhaneetshrestha.afnopadd.document.StrokePoints
 import io.github.subhaneetshrestha.afnopadd.document.WorldPoint
 
 /** What a single pointer does on the canvas; decided per pointer kind by the finger-mode policy in `drawing-tools`. */
@@ -20,9 +23,27 @@ data class CanvasPointerEvent(
     val timeMillis: Long,
 )
 
-/** Implemented by the active tool: receives the single-pointer events the canvas does not use for navigation. */
-fun interface CanvasInputSink {
+/**
+ * The zoom frame a stroke is drawn in: its anchor (the first input's world position), its level,
+ * and the frame-to-screen transform at the moment the stroke started. Brush sizes and stroke
+ * points are expressed in this frame's units.
+ */
+data class StrokeFrame(val anchor: WorldPoint, val level: Int, val transform: FrameTransform)
+
+/** A wet stroke that Ink has finished: the Ink stroke itself plus everything needed to make a `StrokeElement`. */
+class FinishedStroke(
+    val stroke: Stroke,
+    val frame: StrokeFrame,
+    val points: StrokePoints,
+    val brush: BrushSpec,
+    val kind: PointerKind,
+)
+
+/** Implemented by the active tool: receives single-pointer events the canvas does not use for navigation, and finished wet strokes. */
+interface CanvasInputSink {
     fun onPointer(event: CanvasPointerEvent)
+
+    fun onWetStrokeFinished(stroke: FinishedStroke) = Unit
 }
 
 /** Sheet background drawn in screen space so it never aliases, whatever the zoom. */
