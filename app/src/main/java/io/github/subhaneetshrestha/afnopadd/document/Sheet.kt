@@ -97,15 +97,18 @@ interface Sheet {
     val canUndo: StateFlow<Boolean>
     val canRedo: StateFlow<Boolean>
 
+    /** Binary assets referenced by this sheet's image elements. */
+    val assets: AssetStore
+
     /** Runs [block] atomically: if it throws, nothing is applied. Returns [TransactionResult.NoChange] when nothing changed. */
     fun transact(label: String, block: Transaction.() -> Unit): TransactionResult
 
     fun undo()
     fun redo()
 
-    /** Waits until every committed transaction has reached disk. */
+    /** Waits until every committed transaction has reached disk; rethrows the first write failure since the last flush. */
     suspend fun flush()
 
-    /** Flushes, then releases the database; the sheet must not be used afterwards. */
+    /** Flushes, compacts history, collects unreferenced assets and releases the database; the sheet must not be used afterwards. */
     suspend fun close()
 }

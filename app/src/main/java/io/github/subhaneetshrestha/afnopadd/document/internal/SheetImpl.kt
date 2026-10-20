@@ -1,5 +1,7 @@
 package io.github.subhaneetshrestha.afnopadd.document.internal
 
+import io.github.subhaneetshrestha.afnopadd.document.AssetId
+import io.github.subhaneetshrestha.afnopadd.document.AssetStore
 import io.github.subhaneetshrestha.afnopadd.document.CommittedTransaction
 import io.github.subhaneetshrestha.afnopadd.document.Element
 import io.github.subhaneetshrestha.afnopadd.document.ElementDiff
@@ -17,6 +19,8 @@ import io.github.subhaneetshrestha.afnopadd.document.Ulid
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.io.File
+import java.io.InputStream
 
 /**
  * In-memory sheet state with transaction, undo and redo semantics. Persistence is delegated to the
@@ -29,8 +33,9 @@ internal class SheetImpl(
     private val ulid: Ulid = Ulid.Default,
     private val clock: () -> Long = System::currentTimeMillis,
     private val historyLimit: Int = DEFAULT_HISTORY_LIMIT,
+    override val assets: AssetStore = UnavailableAssetStore,
     private val onFlush: suspend () -> Unit = {},
-    private val onClose: suspend () -> Unit = {},
+    private val onClose: suspend (ElementSnapshot) -> Unit = {},
 ) : Sheet {
 
     private val lock = Any()
@@ -89,10 +94,7 @@ internal class SheetImpl(
 
     override suspend fun flush() = onFlush()
 
-    override suspend fun close() {
-        onFlush()
-        onClose()
-    }
+    override suspend fun close() = onClose(_snapshot.value)
 
     private fun CommittedTransaction.inverse(kind: TransactionKind) = CommittedTransaction(
         id = TransactionId(ulid.next()),
@@ -180,6 +182,16 @@ internal class SheetImpl(
         fun diffs(): List<ElementDiff> = changes.values.toList()
 
         fun titleChange(): TitleChange? = if (title != baseTitle) TitleChange(baseTitle, title) else null
+    }
+
+    /** Placeholder for sheets that have no asset directory (pure in-memory tests). */
+    private object UnavailableAssetStore : AssetStore {
+        override suspend fun put(source: InputStream, mime: String, width: Int, height: Int): AssetId =
+            throw UnsupportedOperationException("This sheet has no asset store")
+
+        override fun file(id: AssetId): File = throw UnsupportedOperationException("This sheet has no asset store")
+
+        override suspend fun collectGarbage(referenced: Set<AssetId>): Int = 0
     }
 
     private companion object {

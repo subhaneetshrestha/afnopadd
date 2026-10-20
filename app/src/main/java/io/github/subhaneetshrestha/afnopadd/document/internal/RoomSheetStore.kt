@@ -1,7 +1,10 @@
 package io.github.subhaneetshrestha.afnopadd.document.internal
 
 import android.content.Context
+import io.github.subhaneetshrestha.afnopadd.document.CommittedTransaction
+import io.github.subhaneetshrestha.afnopadd.document.Element
 import io.github.subhaneetshrestha.afnopadd.document.ElementId
+import io.github.subhaneetshrestha.afnopadd.document.ImageElement
 import io.github.subhaneetshrestha.afnopadd.document.SHEET_SCHEMA_VERSION
 import io.github.subhaneetshrestha.afnopadd.document.Sheet
 import io.github.subhaneetshrestha.afnopadd.document.SheetFormatException
@@ -28,6 +31,8 @@ internal class RoomSheetStore(
     private val ulid: Ulid = Ulid.Default,
     private val clock: () -> Long = System::currentTimeMillis,
     private val codec: ElementJsonCodec = ElementJsonCodec(),
+    /** Test seam: runs inside each database transaction before it commits. */
+    private val beforeCommit: suspend (CommittedTransaction) -> Unit = {},
 ) : SheetStore {
 
     override suspend fun create(dir: File, title: String): Sheet {
@@ -47,7 +52,7 @@ internal class RoomSheetStore(
                     MetaEntity(META_UPDATED_AT, meta.updatedAt.toString()),
                 ),
             )
-            return newSheet(meta, emptyList(), database)
+            return newSheet(meta, emptyList(), database, dir)
         } catch (e: Throwable) {
             database.close()
             throw e
@@ -79,22 +84,40 @@ internal class RoomSheetStore(
                     }
                 }.awaitAll().flatten()
             }
-            return newSheet(meta, elements, database)
+            return newSheet(meta, elements, database, dir)
         } catch (e: Throwable) {
             database.close()
             throw e
         }
     }
 
-    private fun newSheet(meta: SheetMeta, elements: List<io.github.subhaneetshrestha.afnopadd.document.Element>, database: SheetDatabase): Sheet =
-        SheetImpl(
+    private fun newSheet(meta: SheetMeta, elements: List<Element>, database: SheetDatabase, dir: File): Sheet {
+        val writer = RoomSheetWriter(database, codec, beforeCommit)
+        val assets = FileAssetStore(File(dir, ASSETS_DIRECTORY), RoomAssetRegistry(database.assetDao()), clock)
+        return SheetImpl(
             meta = meta,
             initialElements = elements,
-            writer = { /* persisted transactions arrive in Task 6 */ },
+            writer = writer,
             ulid = ulid,
             clock = clock,
-            onClose = { database.close() },
+            assets = assets,
+            onFlush = { writer.flush() },
+            onClose = { snapshot ->
+                try {
+                    writer.close()
+                } finally {
+                    try {
+                        database.sheetWriteDao().compactOps(OPS_TO_KEEP)
+                        database.sheetWriteDao().purgeTombstones()
+                        val referenced = snapshot.elements.values.filterIsInstance<ImageElement>().map { it.asset }.toSet()
+                        assets.collectGarbage(referenced)
+                    } finally {
+                        database.close()
+                    }
+                }
+            },
         )
+    }
 
     private suspend fun readMeta(database: SheetDatabase): SheetMeta {
         val values = database.metaDao().getAll().associate { it.key to it.value }
@@ -125,7 +148,9 @@ internal class RoomSheetStore(
         throw SheetFormatException("Stroke points for element $elementId are corrupt", e)
     }
 
-    private companion object {
+    internal companion object {
+        const val ASSETS_DIRECTORY = "assets"
+        const val OPS_TO_KEEP = 1_000
         const val DECODE_CHUNK_SIZE = 256
         const val META_SCHEMA_VERSION = "schema_version"
         const val META_SHEET_ID = "sheet_id"

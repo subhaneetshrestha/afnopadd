@@ -141,11 +141,11 @@ Conventions:
 
 | Level | Framework | Location | What it covers |
 |---|---|---|---|
-| Unit (JVM) | JUnit 4, kotlinx-coroutines-test, Room with `BundledSQLiteDriver` where it runs on the JVM | `app/src/test` | Element model, transactions, undo/redo, fractional indexing, camera and frame math, migrations, package round trips, tool state machines fed with scripted pointer sequences, layout JSON parsing |
-| Instrumented | AndroidX test runner, Compose UI test | `app/src/androidTest` | Room on device, Ink stroke creation and rendering, image decode pipeline, intent-filter import, performance timings on a real device |
+| Unit (JVM) | JUnit 4, kotlinx-coroutines-test | `app/src/test` | Element model, transactions, undo/redo, fractional indexing, asset store file logic, camera and frame math, package round trips, tool state machines fed with scripted pointer sequences, layout JSON parsing |
+| Instrumented | AndroidX test runner, Compose UI test | `app/src/androidTest` | Everything Room-backed (persistence, migrations, sheet open/create), Ink stroke creation and rendering, image decode pipeline, intent-filter import, performance timings on a device; Room's Android artifact needs a `Context`, so it cannot run in JVM unit tests |
 | Manual checklist | `docs/checklists/release.md` | | Stroke feel and latency, palm rejection, sharing through Gmail/Telegram/Files, F-Droid anti-feature scan |
 
-Rules: a bug fix starts with a failing test that reproduces it. Pure logic (document, camera math, tools) targets at least 80 percent line coverage, measured with the JaCoCo support built into AGP (`enableUnitTestCoverage`); UI and rendering are not coverage-measured. Instrumented tests must pass on one API 29 device and one API 34+ device before a release because the two use different Ink rendering paths. If Room cannot run on the JVM for a given test, the test moves to `androidTest`; Robolectric is not added without approval.
+Rules: a bug fix starts with a failing test that reproduces it. Pure logic (document, camera math, tools) targets at least 80 percent line coverage, measured with the JaCoCo support built into AGP (`enableUnitTestCoverage`); UI and rendering are not coverage-measured. Instrumented tests must pass on one API 29 device and one API 34+ device before a release because the two use different Ink rendering paths. Robolectric is not added without approval. Before an instrumented run on the emulator, keep its screen on (`adb shell svc power stayon true`); a sleeping screen stalls activity tests.
 
 ## Boundaries
 

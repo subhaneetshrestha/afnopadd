@@ -39,10 +39,10 @@ T1 build plumbing ─┬─ T2 app shell skeleton ──────────
 - [x] Task 3: Document model primitives and stroke point codec (2026-10-20)
 - [x] Task 4: In-memory sheet with transactions and undo/redo (2026-10-20)
 - [x] Task 5: Room schema and SheetStore create/open (2026-10-20)
-- [ ] Task 6: Persisted transactions, op log, autosave, crash safety
+- [x] Task 6: Persisted transactions, op log, autosave, crash safety (2026-10-20)
 
-### Checkpoint A: Document foundation
-- [ ] `.\gradlew.bat check` green; Room round trip of 5,000 strokes passes; crash test passes
+### Checkpoint A: Document foundation (reached 2026-10-20)
+- [x] `.\gradlew.bat check` green; Room round trip of 5,000 strokes passes; crash test passes
 
 - [ ] Task 7: Camera model and canvas math
 - [ ] Task 8: SheetCanvas composable with pan, pinch, background
