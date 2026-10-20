@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 11 and below: the same cloud exclusions as data_extraction_rules.xml. -->
+<full-backup-content>
+    <exclude domain="file" path="sheets/" />
+    <exclude domain="file" path="trash/" />
+    <exclude domain="file" path="quarantine/" />
+    <exclude domain="file" path="library.db" />
+    <exclude domain="file" path="library.db-wal" />
+    <exclude domain="file" path="library.db-shm" />
+</full-backup-content>
