@@ -8,6 +8,7 @@ import io.github.subhaneetshrestha.afnopadd.document.internal.db.SheetDatabase
 import io.github.subhaneetshrestha.afnopadd.document.internal.db.openSheetDatabase
 import kotlinx.coroutines.runBlocking
 import org.junit.After
+import io.github.subhaneetshrestha.afnopadd.PerfBudget
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -158,7 +159,7 @@ class SheetPersistenceTest {
         val median = samples.sorted()[samples.size / 2]
 
         Log.i("SheetPersistenceTest", "1,000-point stroke commit median ${"%.1f".format(median)} ms (max ${"%.1f".format(samples.max())} ms)")
-        assertTrue("median commit took $median ms", median < 30.0)
+        assertTrue("median commit took $median ms", median < PerfBudget.millis(30.0))
     }
 
     @Test

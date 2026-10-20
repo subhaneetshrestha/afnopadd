@@ -23,8 +23,10 @@ import androidx.compose.ui.unit.dp
 import io.github.subhaneetshrestha.afnopadd.R
 import io.github.subhaneetshrestha.afnopadd.canvas.CameraController
 import io.github.subhaneetshrestha.afnopadd.canvas.SheetCanvas
+import android.util.Log
 import io.github.subhaneetshrestha.afnopadd.document.Sheet
-import io.github.subhaneetshrestha.afnopadd.document.SheetStore
+import io.github.subhaneetshrestha.afnopadd.document.SheetFormatException
+import io.github.subhaneetshrestha.afnopadd.document.SheetId
 import io.github.subhaneetshrestha.afnopadd.tools.Command
 import io.github.subhaneetshrestha.afnopadd.tools.CommandRegistry
 import io.github.subhaneetshrestha.afnopadd.tools.CurrentStyle
@@ -41,24 +43,43 @@ import java.io.File
 
 /**
  * The editor: opens the sheet, wires the tool and command registries to the canvas and toolbar,
- * and closes the sheet (flush, compaction, asset garbage collection) when it leaves composition.
- * Until the library exists every sheet id maps to the placeholder sheet directory.
+ * marks it opened in the library, and closes it (flush, compaction, asset garbage collection)
+ * when it leaves composition, then refreshes its library entry.
  */
 @Composable
 fun EditorScreen(sheetId: String, modifier: Modifier = Modifier) {
     val container = LocalAppContainer.current
     val context = LocalContext.current
     var sheet by remember(sheetId) { mutableStateOf<Sheet?>(null) }
-    val defaultTitle = stringResource(R.string.sheet_default_title)
+    var failed by remember(sheetId) { mutableStateOf(false) }
 
     LaunchedEffect(sheetId) {
-        sheet = openOrCreate(container.sheetStore, placeholderSheetDir(context), defaultTitle)
+        try {
+            sheet = container.sheetStore.open(File(sheetsRoot(context), sheetId))
+            container.library.markOpened(SheetId(sheetId))
+        } catch (e: SheetFormatException) {
+            Log.w("EditorScreen", "Could not open sheet $sheetId", e)
+            failed = true
+        }
     }
     DisposableEffect(sheet) {
         val open = sheet
-        onDispose { open?.let { container.appScope.launch { it.close() } } }
+        onDispose {
+            open?.let {
+                container.appScope.launch {
+                    it.close()
+                    container.library.refresh(SheetId(sheetId))
+                }
+            }
+        }
     }
 
+    if (failed) {
+        Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(text = stringResource(R.string.editor_open_failed))
+        }
+        return
+    }
     val current = sheet
     if (current == null) {
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -109,8 +130,5 @@ private fun EditorContent(sheet: Sheet, modifier: Modifier) {
         )
     }
 }
-
-private suspend fun openOrCreate(store: SheetStore, dir: File, defaultTitle: String): Sheet =
-    if (File(dir, SheetStore.DATABASE_FILE_NAME).isFile) store.open(dir) else store.create(dir, defaultTitle)
 
 private const val DEFAULT_LAYOUT_ASSET = "tool_layout_default.json"

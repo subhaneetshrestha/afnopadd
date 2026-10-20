@@ -10,17 +10,16 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import io.github.subhaneetshrestha.afnopadd.R
-import io.github.subhaneetshrestha.afnopadd.document.StrokeElement
-import io.github.subhaneetshrestha.afnopadd.document.internal.RoomSheetStore
+import io.github.subhaneetshrestha.afnopadd.library.LibraryTags
+import io.github.subhaneetshrestha.afnopadd.library.SheetSummary
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
-import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** The walking skeleton: open the editor, draw with the pen, leave, and the stroke is on disk. */
+/** The menu-to-editor flow: create a sheet, draw, leave, and continue where you left off. */
 @RunWith(AndroidJUnit4::class)
 class EditorFlowTest {
 
@@ -28,33 +27,26 @@ class EditorFlowTest {
     val composeRule = createAndroidComposeRule<MainActivity>()
 
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
+    private val container get() = (context.applicationContext as AfnopaddApp).container
 
-    @Before
-    fun startFromAnEmptySheet() {
-        placeholderSheetDir(context).deleteRecursively()
-    }
+    private fun lastOpened(): SheetSummary? = runBlocking { container.library.lastOpened.first() }
 
-    private fun openEditorAndDraw() {
-        composeRule.onNodeWithTag(ShellTags.OPEN_EDITOR).performClick()
+    private fun strokeCount(sheet: SheetSummary): Int = runBlocking { container.sheetStore.inspect(sheet.dir).elementCount }
+
+    private fun createSheetAndDraw(): SheetSummary {
+        val before = lastOpened()?.id
+        composeRule.onNodeWithTag(LibraryTags.NEW_SHEET).performClick()
         composeRule.onNodeWithTag(ShellTags.EDITOR_CANVAS).assertIsDisplayed()
+        composeRule.waitUntil(timeoutMillis = 5_000) { lastOpened()?.id.let { it != null && it != before } }
+        val sheet = lastOpened()!!
         composeRule.onNodeWithTag(ShellTags.EDITOR_CANVAS).performTouchInput {
             down(Offset(200f, 400f))
             moveTo(Offset(300f, 450f))
             moveTo(Offset(400f, 500f))
             up()
         }
-        composeRule.waitUntil(timeoutMillis = 10_000) { sheetHasStrokes() }
-    }
-
-    private fun sheetHasStrokes(): Boolean = runBlocking {
-        val dir = placeholderSheetDir(context)
-        if (!dir.isDirectory) return@runBlocking false
-        val sheet = RoomSheetStore(context).open(dir)
-        try {
-            sheet.snapshot.value.elements.values.any { it is StrokeElement }
-        } finally {
-            sheet.close()
-        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { strokeCount(sheet) == 1 }
+        return sheet
     }
 
     private fun leaveEditor() {
@@ -64,32 +56,27 @@ class EditorFlowTest {
     }
 
     @Test
-    fun aPenStrokeIsPersistedAfterLeavingTheEditor() {
-        openEditorAndDraw()
+    fun aNewSheetKeepsItsStrokeAndBecomesContinue() {
+        val sheet = createSheetAndDraw()
         leaveEditor()
 
-        val sheet = runBlocking { RoomSheetStore(context).open(placeholderSheetDir(context)) }
-        try {
-            val strokes = sheet.snapshot.value.elements.values.filterIsInstance<StrokeElement>()
-            assertEquals(1, strokes.size)
-            assertTrue(strokes.single().points.count >= 2)
-        } finally {
-            runBlocking { sheet.close() }
+        assertEquals(1, strokeCount(sheet))
+        composeRule.onNodeWithTag(LibraryTags.CONTINUE).assertIsDisplayed()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            runBlocking { container.library.sheets.first() }.first { it.id == sheet.id }.elementCount == 1
         }
+        composeRule.onNodeWithTag(LibraryTags.CONTINUE).performClick()
+        composeRule.onNodeWithTag(ShellTags.EDITOR_CANVAS).assertIsDisplayed()
+        assertEquals(sheet.id, lastOpened()?.id)
     }
 
     @Test
     fun undoRemovesTheStrokeBeforeLeaving() {
-        openEditorAndDraw()
+        val sheet = createSheetAndDraw()
         composeRule.onNodeWithContentDescription(context.getString(R.string.command_undo)).performClick()
-        composeRule.waitForIdle()
+        composeRule.waitUntil(timeoutMillis = 10_000) { strokeCount(sheet) == 0 }
         leaveEditor()
 
-        val sheet = runBlocking { RoomSheetStore(context).open(placeholderSheetDir(context)) }
-        try {
-            assertTrue(sheet.snapshot.value.elements.isEmpty())
-        } finally {
-            runBlocking { sheet.close() }
-        }
+        assertEquals(0, strokeCount(sheet))
     }
 }

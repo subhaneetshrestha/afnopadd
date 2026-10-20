@@ -13,6 +13,7 @@ import io.github.subhaneetshrestha.afnopadd.library.internal.openLibraryDatabase
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
+import io.github.subhaneetshrestha.afnopadd.PerfBudget
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -115,7 +116,7 @@ class SheetLibraryTest {
         assertNotEquals(original.id, copy.id)
         assertEquals("Copy of Sheet 1", copy.title)
         assertEquals(5_000, copy.elementCount)
-        assertTrue("duplicate took $elapsedMillis ms", elapsedMillis < 2_000)
+        assertTrue("duplicate took $elapsedMillis ms", elapsedMillis < PerfBudget.millis(2_000L))
         val reopened = store.open(copy.dir)
         try {
             assertEquals(copy.id, reopened.meta.value.id)

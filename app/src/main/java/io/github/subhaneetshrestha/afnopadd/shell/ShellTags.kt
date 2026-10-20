@@ -5,5 +5,4 @@ object ShellTags {
     const val LIBRARY_SCREEN = "screen:library"
     const val EDITOR_SCREEN = "screen:editor"
     const val EDITOR_CANVAS = "editor:canvas"
-    const val OPEN_EDITOR = "action:open-editor"
 }

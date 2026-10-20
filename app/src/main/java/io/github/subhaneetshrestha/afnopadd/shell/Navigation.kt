@@ -23,9 +23,7 @@ fun AfnopaddNavigation(modifier: Modifier = Modifier) {
         onBack = { backStack.removeLastOrNull() },
         entryProvider = entryProvider {
             entry<Destination.Library> {
-                LibraryPlaceholder(
-                    onOpenEditor = { backStack.add(Destination.Editor(sheetId = PLACEHOLDER_SHEET_ID)) },
-                )
+                LibraryRoute(onOpenSheet = { id -> backStack.add(Destination.Editor(sheetId = id.value)) })
             }
             entry<Destination.Editor> { key ->
                 Box(Modifier.fillMaxSize().testTag(ShellTags.EDITOR_SCREEN)) {
@@ -35,6 +33,3 @@ fun AfnopaddNavigation(modifier: Modifier = Modifier) {
         },
     )
 }
-
-/** Until the library exists, the placeholder opens one fixed sheet id. */
-private const val PLACEHOLDER_SHEET_ID = "placeholder"

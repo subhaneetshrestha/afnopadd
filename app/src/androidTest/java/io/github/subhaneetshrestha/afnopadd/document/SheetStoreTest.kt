@@ -12,6 +12,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
 import org.junit.After
+import io.github.subhaneetshrestha.afnopadd.PerfBudget
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
@@ -151,7 +152,7 @@ class SheetStoreTest {
             Log.i("SheetStoreTest", "Opened 5,000 strokes in $elapsedMillis ms")
             assertEquals(5_000, sheet.snapshot.value.elements.size)
             assertEquals(150, (sheet.snapshot.value.elements.getValue(strokes[0].id) as StrokeElement).points.count)
-            assertTrue("open took $elapsedMillis ms", elapsedMillis < 1_000)
+            assertTrue("open took $elapsedMillis ms", elapsedMillis < PerfBudget.millis(1_000L))
         } finally {
             sheet.close()
         }

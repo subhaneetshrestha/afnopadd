@@ -2,11 +2,28 @@
 <resources>
     <string name="app_name">Afnopadd</string>
 
-    <!-- Shell placeholders, replaced when the library screen lands -->
-    <string name="library_placeholder_title">Library</string>
-    <string name="action_open_editor">Open editor</string>
+    <!-- Library -->
+    <string name="action_new_sheet">New sheet</string>
+    <string name="action_continue">Continue</string>
+    <string name="library_all_sheets">All sheets</string>
+    <string name="action_rename">Rename</string>
+    <string name="action_duplicate">Duplicate</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_undo">Undo</string>
+    <string name="library_delete_title">Delete sheet?</string>
+    <string name="library_delete_message">\"%1$s\" moves to the trash and is removed for good after 7 days.</string>
+    <string name="library_deleted">Deleted \"%1$s\"</string>
+    <plurals name="library_title_invalid">
+        <item quantity="one">Enter up to %1$d character</item>
+        <item quantity="other">Enter 1 to %1$d characters</item>
+    </plurals>
+    <string name="sheet_default_title_prefix">Sheet</string>
+    <string name="sheet_copy_title">Copy of %1$s</string>
+
+    <!-- Editor -->
     <string name="editor_loading">Opening sheet…</string>
-    <string name="sheet_default_title">Untitled sheet</string>
+    <string name="editor_open_failed">This sheet could not be opened.</string>
 
     <!-- Tools and commands -->
     <string name="tool_pen">Pen</string>
