@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -15,21 +16,30 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.graphics.withMatrix
 import androidx.ink.authoring.InProgressStrokesView
+import androidx.ink.rendering.android.canvas.CanvasStrokeRenderer
 import io.github.subhaneetshrestha.afnopadd.canvas.internal.BackgroundPainter.drawBackground
+import io.github.subhaneetshrestha.afnopadd.canvas.internal.InkBridge.toAndroidMatrix
+import io.github.subhaneetshrestha.afnopadd.canvas.internal.StrokeCache
 import io.github.subhaneetshrestha.afnopadd.canvas.internal.WetStrokeRouter
 import io.github.subhaneetshrestha.afnopadd.canvas.internal.canvasGestures
 import io.github.subhaneetshrestha.afnopadd.document.BrushSpec
+import io.github.subhaneetshrestha.afnopadd.document.Element
 import io.github.subhaneetshrestha.afnopadd.document.Sheet
+import io.github.subhaneetshrestha.afnopadd.document.StrokeElement
 import io.github.subhaneetshrestha.afnopadd.document.WorldPoint
 
 /**
  * The drawing surface. Observes the sheet and the camera, paints the background in screen space,
- * routes gestures (two pointers to the camera, one pointer per [pointerRole]), draws wet strokes
- * through Jetpack Ink when [wetStrokeBrush] returns a brush, and reports its pixel size through
- * [onViewportChanged]. Element rendering is a placeholder outline until the painters land.
+ * draws dry strokes through Ink's renderer with each element's exact frame transform, routes
+ * gestures (two pointers to the camera, one pointer per [pointerRole]), draws wet strokes through
+ * Jetpack Ink when [wetStrokeBrush] returns a brush, and reports its pixel size through
+ * [onViewportChanged]. Shapes and images render as placeholder outlines until their painters land.
  */
 @Composable
 fun SheetCanvas(
@@ -45,8 +55,11 @@ fun SheetCanvas(
     val snapshot by sheet.snapshot.collectAsState()
     val camera by cameraController.camera.collectAsState()
     var viewport by remember { mutableStateOf(Viewport(0, 0)) }
+    var handoffTick by remember { mutableIntStateOf(0) }
+    val renderer = remember { CanvasStrokeRenderer.create() }
+    val strokeCache = remember { StrokeCache() }
     val router = remember(inputSink, cameraController, wetStrokeBrush) {
-        WetStrokeRouter(inputSink, cameraController, { viewport }, wetStrokeBrush)
+        WetStrokeRouter(inputSink, cameraController, { viewport }, wetStrokeBrush, onHandoffPending = { handoffTick++ })
     }
 
     Box(
@@ -59,17 +72,34 @@ fun SheetCanvas(
     ) {
         Spacer(
             modifier = Modifier.fillMaxSize().drawBehind {
+                @Suppress("UNUSED_EXPRESSION")
+                handoffTick // read so a pending handoff redraws the dry layer even if nothing else changed
                 drawBackground(background, camera, viewport)
-                for (element in snapshot.ordered) {
-                    val topLeft = CanvasMath.worldToScreen(camera, viewport, WorldPoint(element.bounds.left, element.bounds.top))
-                    val bottomRight = CanvasMath.worldToScreen(camera, viewport, WorldPoint(element.bounds.right, element.bounds.bottom))
-                    if (bottomRight.x < 0 || bottomRight.y < 0 || topLeft.x > viewport.widthPx || topLeft.y > viewport.heightPx) continue
-                    drawRect(
-                        color = PlaceholderOutline,
-                        topLeft = Offset(topLeft.x.toFloat(), topLeft.y.toFloat()),
-                        size = Size((bottomRight.x - topLeft.x).toFloat(), (bottomRight.y - topLeft.y).toFloat()),
-                        style = Stroke(width = 1f),
-                    )
+                drawIntoCanvas { composeCanvas ->
+                    val nativeCanvas = composeCanvas.nativeCanvas
+                    for (element in snapshot.ordered) {
+                        if (!isVisible(element, camera, viewport)) continue
+                        if (element is StrokeElement) {
+                            // Ink positions the stroke with the canvas transform; the matrix argument only
+                            // tells it the stroke-to-screen scale for anti-aliasing, so both must agree.
+                            val matrix = CanvasMath.frameToScreen(camera, viewport, element.anchor, element.frameLevel).toAndroidMatrix()
+                            val stroke = strokeCache.strokeFor(element)
+                            nativeCanvas.withMatrix(matrix) { renderer.draw(this, stroke, matrix) }
+                        } else {
+                            val topLeft = CanvasMath.worldToScreen(camera, viewport, WorldPoint(element.bounds.left, element.bounds.top))
+                            val bottomRight = CanvasMath.worldToScreen(camera, viewport, WorldPoint(element.bounds.right, element.bounds.bottom))
+                            drawRect(
+                                color = PlaceholderOutline,
+                                topLeft = Offset(topLeft.x.toFloat(), topLeft.y.toFloat()),
+                                size = Size((bottomRight.x - topLeft.x).toFloat(), (bottomRight.y - topLeft.y).toFloat()),
+                                style = Stroke(width = 1f),
+                            )
+                        }
+                    }
+                }
+                // The dry layer now holds everything the tool committed; let Ink drop its copies after this frame.
+                router.drainHandoff()?.let { ids ->
+                    router.view?.let { view -> view.post { view.removeFinishedStrokes(ids) } }
                 }
             },
         )
@@ -88,6 +118,12 @@ fun SheetCanvas(
             onRelease = { router.view = null },
         )
     }
+}
+
+private fun isVisible(element: Element, camera: Camera, viewport: Viewport): Boolean {
+    val topLeft = CanvasMath.worldToScreen(camera, viewport, WorldPoint(element.bounds.left, element.bounds.top))
+    val bottomRight = CanvasMath.worldToScreen(camera, viewport, WorldPoint(element.bounds.right, element.bounds.bottom))
+    return bottomRight.x >= 0 && bottomRight.y >= 0 && topLeft.x <= viewport.widthPx && topLeft.y <= viewport.heightPx
 }
 
 private val PlaceholderOutline = Color(0xFF9E9E9E)

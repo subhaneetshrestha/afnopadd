@@ -21,14 +21,18 @@ import io.github.subhaneetshrestha.afnopadd.document.BrushSpec
 /**
  * Sits between the gesture handler and the tool. Every pointer event is forwarded downstream; the
  * ones that start, extend, finish or cancel a stroke also drive Jetpack Ink's [InProgressStrokesView]
- * through its `StrokeInput` API, in the zoom frame fixed at the stroke's first sample. Finished Ink
- * strokes come back as [FinishedStroke]s and are then removed from the view.
+ * through its `StrokeInput` API, in the zoom frame fixed at the stroke's first sample.
+ *
+ * Finished Ink strokes come back as [FinishedStroke]s. Ink keeps drawing its own copy until the
+ * canvas has drawn the committed element once, then [drainHandoff] releases them, so the stroke
+ * never blinks between the wet and dry layers.
  */
 internal class WetStrokeRouter(
     private val downstream: CanvasInputSink,
     private val cameraController: CameraController,
     private val viewport: () -> Viewport,
     private val wetStrokeBrush: (StrokeFrame) -> BrushSpec?,
+    private val onHandoffPending: () -> Unit = {},
 ) : CanvasInputSink, InProgressStrokesFinishedListener {
 
     private class ActiveStroke(
@@ -49,6 +53,7 @@ internal class WetStrokeRouter(
 
     private var active: ActiveStroke? = null
     private val awaitingFinish = HashMap<InProgressStrokeId, ActiveStroke>()
+    private val pendingHandoff = LinkedHashSet<InProgressStrokeId>()
 
     override fun onPointer(event: CanvasPointerEvent) {
         downstream.onPointer(event)
@@ -73,7 +78,16 @@ internal class WetStrokeRouter(
                 ),
             )
         }
-        view?.removeFinishedStrokes(strokes.keys)
+        pendingHandoff += strokes.keys
+        onHandoffPending()
+    }
+
+    /** Called by the canvas after it has drawn a frame; returns the Ink strokes that can now be released. */
+    fun drainHandoff(): Set<InProgressStrokeId>? {
+        if (pendingHandoff.isEmpty()) return null
+        val ids = pendingHandoff.toSet()
+        pendingHandoff.clear()
+        return ids
     }
 
     private fun begin(event: CanvasPointerEvent) {

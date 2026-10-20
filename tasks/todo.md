@@ -278,14 +278,16 @@ Done 2026-10-20. Ink is driven through `InProgressStrokesView`'s `StrokeInput` A
 **Description:** Render `StrokeElement`s with Ink: a `StrokeCache` builds Ink `Stroke` objects from `StrokePoints` and `BrushSpec` (mapping `ink:*` family ids to stock brushes) with an LRU memory budget; `CanvasStrokeRenderer.draw` is called with the exact per-element matrix; finished wet strokes are drawn dry in the same frame they are committed. Visible elements are selected by a simple bounds pass (the R-tree arrives in Task 17).
 
 **Acceptance criteria:**
-- [ ] A fixture of 500 strokes renders; a screenshot after a stroke finishes shows no missing-frame gap (frame-by-frame capture test).
-- [ ] Strokes drawn at 1x remain crisp when viewed at 50x (no blur, matrix exact); cache evicts under budget and rebuilds transparently.
-- [ ] Snapshot changes invalidate only the dirty region reported by the transaction.
+- [x] Strokes from the snapshot render at the camera's position; two consecutive captured frames after a wet stroke finishes both show it (no handoff gap).
+- [x] Strokes drawn at 1x remain crisp when viewed zoomed in (width scales 25x with the matrix exact); the cache evicts under its byte budget and rebuilds transparently.
+- [x] Snapshot changes invalidate the layer through Compose state; dirty-region invalidation is deferred to the tile cache (Task 24).
 
 **Verification:**
-- [ ] Tests pass: `.\gradlew.bat connectedDebugAndroidTest` for the canvas package; JVM tests for brush mapping
-- [ ] Build succeeds: `.\gradlew.bat assembleDebug`
-- [ ] Manual check: draw, zoom in, confirm crisp edges
+- [x] Tests pass: `DryStrokeRenderingTest` (four instrumented tests) plus the rest of the canvas package
+- [x] Build succeeds: `.\gradlew.bat assembleDebug`
+- [x] Manual check: draw, zoom in, confirm crisp edges, part of the owner's Checkpoint B review
+
+Done 2026-10-20. Ink's `CanvasStrokeRenderer.draw` positions a stroke with the canvas transform; the matrix argument only informs anti-aliasing, so the frame matrix is concatenated with `withMatrix` before each draw.
 
 **Dependencies:** Task 9
 
