@@ -34,7 +34,7 @@ T1 build plumbing ─┬─ T2 app shell skeleton ──────────
 ## Task list
 
 ### Phase 0: Foundation and walking skeleton
-- [ ] Task 1: Build plumbing and approved dependencies
+- [x] Task 1: Build plumbing and approved dependencies (2026-10-20)
 - [ ] Task 2: App shell skeleton (navigation, theme, container)
 - [ ] Task 3: Document model primitives and stroke point codec
 - [ ] Task 4: In-memory sheet with transactions and undo/redo

@@ -11,14 +11,16 @@ Status: **DRAFT, pending owner review** (2026-10-20). Plan and rationale: `tasks
 **Description:** Add every approved dependency to the version catalog and wire the build so later tasks never touch Gradle: Jetpack Ink, motion prediction, Room with KSP and the bundled SQLite driver plus the Room Gradle plugin with a schema directory, kotlinx.serialization plugin and JSON, Coil 3, DataStore, Navigation 3, exifinterface, lifecycle-runtime-compose, and the test stack (JUnit 4, kotlinx-coroutines-test, AndroidX test, Compose UI test). Turn on Lint warnings-as-errors and unit-test coverage. Verify each unverified version against Maven metadata before pinning.
 
 **Acceptance criteria:**
-- [ ] All dependencies resolve; a trivial `@Entity` compiles through KSP and its schema JSON appears in `app/schemas/`; a trivial `@Serializable` class round-trips in a unit test.
-- [ ] `lint { warningsAsErrors = true; abortOnError = true }` and `enableUnitTestCoverage = true` are set; no `org.jetbrains.kotlin.android` plugin anywhere.
-- [ ] `docs/adr/0001-dependency-baseline.md` lists each library, version, licence, and why.
+- [x] All dependencies resolve; a trivial `@Entity` compiles through KSP and its schema JSON appears in `app/schemas/`; a trivial `@Serializable` class round-trips in a unit test.
+- [x] `lint { warningsAsErrors = true; abortOnError = true }` and `enableUnitTestCoverage = true` are set; no `org.jetbrains.kotlin.android` plugin anywhere.
+- [x] `docs/adr/0001-dependency-baseline.md` lists each library, version, licence, and why.
 
 **Verification:**
-- [ ] `.\gradlew.bat check` passes (includes the two trivial tests)
-- [ ] `.\gradlew.bat assembleDebug` passes
-- [ ] Manual: `.\gradlew.bat :app:dependencies --configuration debugRuntimeClasspath` shows no unexpected transitive network libraries
+- [x] `.\gradlew.bat check` passes (includes the two trivial tests)
+- [x] `.\gradlew.bat assembleDebug` passes
+- [x] Manual: `.\gradlew.bat :app:dependencies --configuration debugRuntimeClasspath` shows no unexpected transitive network libraries (only okio, a file I/O library used by DataStore and Coil)
+
+Done 2026-10-20. Bonus: the instrumented Room test (`SheetDatabaseTest`) passes on the API 36 emulator, which also settles the Task 5 spike.
 
 **Dependencies:** None
 
@@ -106,7 +108,7 @@ Status: **DRAFT, pending owner review** (2026-10-20). Plan and rationale: `tasks
 
 ## Task 5: Room schema and SheetStore create/open
 
-**Description:** Define the per-sheet Room database (`meta`, `element`, `stroke_points`, `asset`, `op`) with the bundled SQLite driver in WAL mode, export its schema, and implement `SheetStore.create` and `open`, which build the initial snapshot from rows. Start with a 30-minute spike proving Room runs in a JVM unit test with `BundledSQLiteDriver`; if it does not, place the tests in `androidTest` and update `SPEC.md`'s testing table.
+**Description:** Define the per-sheet Room database (`meta`, `element`, `stroke_points`, `asset`, `op`) with the bundled SQLite driver in WAL mode, export its schema, and implement `SheetStore.create` and `open`, which build the initial snapshot from rows. The Room-on-JVM spike was answered in Task 1: Room's Android artifact needs a `Context`, so Room-backed tests live in `androidTest` and run on the emulator (ADR 0001); `SPEC.md`'s testing table already allows this.
 
 **Acceptance criteria:**
 - [ ] `create` makes `sheets/<ulid>/sheet.db` with `schema_version = 1`; `open` returns a `Sheet` whose snapshot matches rows written directly through the DAO.
