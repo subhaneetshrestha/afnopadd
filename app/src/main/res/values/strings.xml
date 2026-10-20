@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Afnopadd</string>
+
+    <!-- Shell placeholders, replaced when the library and editor screens land -->
+    <string name="library_placeholder_title">Library</string>
+    <string name="action_open_editor">Open editor</string>
+    <string name="editor_placeholder_title">Editor</string>
+    <string name="editor_placeholder_sheet">Sheet %1$s</string>
 </resources>

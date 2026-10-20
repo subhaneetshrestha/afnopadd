@@ -39,14 +39,16 @@ Done 2026-10-20. Bonus: the instrumented Room test (`SheetDatabaseTest`) passes 
 **Description:** Create the application class, a manual `AppContainer` with stubbed services, Navigation 3 with a saveable back stack holding `Library` and `Editor(sheetId)` placeholders, the Material 3 theme (light/dark, no dynamic colour), and move `MainActivity` into the `shell` package. This is the frame every later slice plugs into.
 
 **Acceptance criteria:**
-- [ ] Launching shows the Library placeholder; a placeholder button opens the Editor placeholder; system back returns; rotation keeps the current destination.
-- [ ] `AppContainer` is created once in `AfnopaddApp` and reachable from composables via a `CompositionLocal`.
-- [ ] Each screen-level composable has a `@Preview` that renders in light and dark.
+- [x] Launching shows the Library placeholder; a placeholder button opens the Editor placeholder; system back returns; rotation keeps the current destination.
+- [x] `AppContainer` is created once in `AfnopaddApp` and reachable from composables via a `CompositionLocal`.
+- [x] Each screen-level composable has a `@Preview` that renders in light and dark.
 
 **Verification:**
-- [ ] Tests pass: `.\gradlew.bat testDebugUnitTest` (navigation state unit test) and a Compose UI test for navigate-and-back in `androidTest`
-- [ ] Build succeeds: `.\gradlew.bat assembleDebug`
-- [ ] Manual check: install, navigate, rotate
+- [x] Tests pass: `.\gradlew.bat testDebugUnitTest` (destination serialization) and `NavigationTest` (launch, navigate-and-back, recreate) on the API 36 emulator
+- [x] Build succeeds: `.\gradlew.bat assembleDebug`
+- [x] Manual check: covered on the emulator by the instrumented recreate test; a hands-on rotate is part of the owner's Checkpoint B review
+
+Done 2026-10-20.
 
 **Dependencies:** Task 1
 
