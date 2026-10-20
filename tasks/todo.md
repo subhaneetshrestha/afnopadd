@@ -65,14 +65,16 @@ Done 2026-10-20.
 **Description:** Implement the value types the whole app shares: `WorldPoint`, `WorldRect`, `ElementId` with a ULID generator, `FractionalIndex` with insert-between, the `Element` sealed hierarchy (`StrokeElement`, `ShapeElement`, `ImageElement`, reserved `NoteElement`, `UnknownElement`), `BrushSpec`, shape kinds and geometry, and the packed Float32 `StrokePoints` codec with a version byte, plus kotlinx.serialization serializers for element payloads with unknown-key tolerance.
 
 **Acceptance criteria:**
-- [ ] ULIDs are 26 characters, Crockford base32, and monotonic within a millisecond; `FractionalIndex.between` never collides across 10,000 random inserts and sorts correctly.
-- [ ] `StrokePoints` encode/decode round-trips 1,000 random points bit-exactly, rejects unknown versions, and stores pressure, tilt, orientation, and time.
-- [ ] Element payload JSON with an extra unknown field decodes and re-encodes without losing the field (`UnknownElement` for unknown kinds).
+- [x] ULIDs are 26 characters, Crockford base32, and monotonic within a millisecond; `FractionalIndex.between` never collides across 10,000 random inserts and sorts correctly.
+- [x] `StrokePoints` encode/decode round-trips 1,000 random points bit-exactly, rejects unknown versions, and stores pressure, tilt, orientation, and time.
+- [x] Element payload JSON with an extra unknown field decodes and re-encodes without losing the field (`UnknownElement` for unknown kinds).
 
 **Verification:**
-- [ ] Tests pass: `.\gradlew.bat testDebugUnitTest --tests "*.document.*"`
-- [ ] Build succeeds: `.\gradlew.bat assembleDebug`
-- [ ] Manual check: none
+- [x] Tests pass: `.\gradlew.bat testDebugUnitTest --tests "*.document.*"` (29 tests)
+- [x] Build succeeds: `.\gradlew.bat assembleDebug`
+- [x] Manual check: none
+
+Done 2026-10-20. Fractional indexes use an integer-plus-fraction scheme, so 10,000 appends or prepends stay under 8 characters.
 
 **Dependencies:** Task 1
 
