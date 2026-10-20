@@ -123,4 +123,32 @@ data class UnknownElement(
     override val extras: JsonObject,
 ) : Element
 
-private val EMPTY_EXTRAS = JsonObject(emptyMap())
+/** The fields every element shares, as stored in plain database columns; the kind-specific rest is a JSON payload. */
+data class CommonFields(
+    val id: ElementId,
+    val anchor: WorldPoint,
+    val frameLevel: Int,
+    val z: FractionalIndex,
+    val bounds: WorldRect,
+    val version: Int,
+    val versionNonce: Int,
+    val createdAt: Long,
+    val updatedAt: Long,
+) {
+    companion object {
+        fun of(element: Element) = CommonFields(
+            id = element.id,
+            anchor = element.anchor,
+            frameLevel = element.frameLevel,
+            z = element.z,
+            bounds = element.bounds,
+            version = element.version,
+            versionNonce = element.versionNonce,
+            createdAt = element.createdAt,
+            updatedAt = element.updatedAt,
+        )
+    }
+}
+
+/** Shared empty `extras` so elements without unknown fields allocate nothing for them. */
+internal val EMPTY_EXTRAS = JsonObject(emptyMap())

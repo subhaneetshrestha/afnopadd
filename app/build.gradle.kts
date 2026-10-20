@@ -59,6 +59,11 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+
+    sourceSets {
+        // Ship the exported Room schemas with the instrumented tests so migrations can be replayed.
+        getByName("androidTest").assets.directories.add("schemas")
+    }
 }
 
 room {

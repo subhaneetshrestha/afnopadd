@@ -47,10 +47,18 @@ class StrokePointsTest {
     }
 
     @Test
-    fun `encoded size is a one byte version, a four byte count and six floats per point`() {
+    fun `encoded size is an eight byte header and six floats per point`() {
         val points = randomPoints(count = 10, seed = 1)
 
-        assertEquals(1 + 4 + 10 * 6 * 4, points.encode().size)
+        assertEquals(8 + 10 * 6 * 4, points.encode().size)
+    }
+
+    @Test
+    fun `the header holds the version byte and the little-endian count at offset four`() {
+        val bytes = randomPoints(count = 3, seed = 1).encode()
+
+        assertEquals(StrokePoints.FORMAT_VERSION, bytes[0])
+        assertEquals(3, bytes[4].toInt() or (bytes[5].toInt() shl 8) or (bytes[6].toInt() shl 16) or (bytes[7].toInt() shl 24))
     }
 
     @Test

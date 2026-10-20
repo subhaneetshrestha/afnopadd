@@ -38,7 +38,7 @@ T1 build plumbing ─┬─ T2 app shell skeleton ──────────
 - [x] Task 2: App shell skeleton (navigation, theme, container) (2026-10-20)
 - [x] Task 3: Document model primitives and stroke point codec (2026-10-20)
 - [x] Task 4: In-memory sheet with transactions and undo/redo (2026-10-20)
-- [ ] Task 5: Room schema and SheetStore create/open
+- [x] Task 5: Room schema and SheetStore create/open (2026-10-20)
 - [ ] Task 6: Persisted transactions, op log, autosave, crash safety
 
 ### Checkpoint A: Document foundation

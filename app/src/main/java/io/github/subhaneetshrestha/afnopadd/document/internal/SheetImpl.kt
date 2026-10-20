@@ -29,6 +29,8 @@ internal class SheetImpl(
     private val ulid: Ulid = Ulid.Default,
     private val clock: () -> Long = System::currentTimeMillis,
     private val historyLimit: Int = DEFAULT_HISTORY_LIMIT,
+    private val onFlush: suspend () -> Unit = {},
+    private val onClose: suspend () -> Unit = {},
 ) : Sheet {
 
     private val lock = Any()
@@ -83,6 +85,13 @@ internal class SheetImpl(
         undoStack.addLast(inverse)
         if (undoStack.size > historyLimit) undoStack.removeFirst()
         publishFlags()
+    }
+
+    override suspend fun flush() = onFlush()
+
+    override suspend fun close() {
+        onFlush()
+        onClose()
     }
 
     private fun CommittedTransaction.inverse(kind: TransactionKind) = CommittedTransaction(

@@ -102,4 +102,10 @@ interface Sheet {
 
     fun undo()
     fun redo()
+
+    /** Waits until every committed transaction has reached disk. */
+    suspend fun flush()
+
+    /** Flushes, then releases the database; the sheet must not be used afterwards. */
+    suspend fun close()
 }

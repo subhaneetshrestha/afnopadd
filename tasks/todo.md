@@ -117,14 +117,16 @@ Done 2026-10-20. Undo and redo are written as inverse transactions (`kind`, `inv
 **Description:** Define the per-sheet Room database (`meta`, `element`, `stroke_points`, `asset`, `op`) with the bundled SQLite driver in WAL mode, export its schema, and implement `SheetStore.create` and `open`, which build the initial snapshot from rows. The Room-on-JVM spike was answered in Task 1: Room's Android artifact needs a `Context`, so Room-backed tests live in `androidTest` and run on the emulator (ADR 0001); `SPEC.md`'s testing table already allows this.
 
 **Acceptance criteria:**
-- [ ] `create` makes `sheets/<ulid>/sheet.db` with `schema_version = 1`; `open` returns a `Sheet` whose snapshot matches rows written directly through the DAO.
-- [ ] Schema JSON for version 1 is committed under `app/schemas/` and a migration test harness exists (empty for now).
-- [ ] Opening a 5,000-stroke database yields the first snapshot in under 1.0 s on the reference phone (instrumented timing test).
+- [x] `create` makes `sheets/<ulid>/sheet.db` with `schema_version = 1`; `open` returns a `Sheet` whose snapshot matches rows written directly through the DAO.
+- [x] Schema JSON for version 1 is committed under `app/schemas/` and a migration test harness exists (empty for now).
+- [x] Opening a 5,000-stroke database yields the first snapshot in under 1.0 s on the reference phone (instrumented timing test). Measured 795 ms cold on the API 36 emulator after moving common fields into columns, hand-decoding JSON, direct-buffer point decoding and parallel decode (was 1,435 ms); the phone number is still to be taken at Checkpoint B.
 
 **Verification:**
-- [ ] Tests pass: `.\gradlew.bat testDebugUnitTest --tests "*.document.*"` or `connectedDebugAndroidTest` per the spike outcome
-- [ ] Build succeeds: `.\gradlew.bat assembleDebug`
-- [ ] Manual check: inspect the schema JSON for the expected tables
+- [x] Tests pass: `connectedDebugAndroidTest` (`SheetStoreTest`, `SheetDatabaseSchemaTest`)
+- [x] Build succeeds: `.\gradlew.bat assembleDebug`
+- [x] Manual check: inspect the schema JSON for the expected tables (meta, element, stroke_points, asset, op)
+
+Done 2026-10-20. Lesson: keep the emulator awake (`adb shell svc power stayon true`) before instrumented runs; a sleeping screen stalled an activity-recreation test for eleven minutes.
 
 **Dependencies:** Task 4
 

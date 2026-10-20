@@ -135,6 +135,41 @@ class ElementJsonCodecTest {
     }
 
     @Test
+    fun `payload encoding carries only kind-specific fields and extras`() {
+        val future = buildJsonObject { put("x", 1) }
+        val element = stroke().copy(extras = future.let { JsonObject(mapOf("future" to it)) })
+
+        val payload = codec.encodePayload(element)
+
+        assertEquals(setOf("brush", "future"), payload.keys)
+    }
+
+    @Test
+    fun `each kind round trips through its payload and common fields`() {
+        for (element in listOf(stroke(), shape(), image())) {
+            val payload = codec.encodePayload(element)
+            val common = CommonFields.of(element)
+
+            val decoded = codec.decodePayload(common, codec.kindOf(element), payload) { points }
+
+            assertEquals(element, decoded)
+        }
+    }
+
+    @Test
+    fun `payload decoding keeps unknown fields and unknown kinds`() {
+        val payload = JsonObject(codec.encodePayload(shape()) + ("beam" to kotlinx.serialization.json.JsonPrimitive(3)))
+        val common = CommonFields.of(shape())
+
+        val decoded = codec.decodePayload(common, "hologram", payload) { StrokePoints.EMPTY }
+
+        assertTrue(decoded is UnknownElement)
+        assertEquals(shapeId, decoded.id)
+        assertEquals(payload, decoded.extras)
+        assertEquals(payload, codec.encodePayload(decoded))
+    }
+
+    @Test
     fun `a stroke points supplier is only consulted for strokes`() {
         var consulted = 0
 

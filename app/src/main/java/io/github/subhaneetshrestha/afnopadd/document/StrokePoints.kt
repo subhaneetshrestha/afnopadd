@@ -24,13 +24,22 @@ class StrokePoints private constructor(
     fun orientationRad(index: Int): Float = data[4 * count + index]
     fun timeMillis(index: Int): Float = data[5 * count + index]
 
-    /** Serialises to the versioned binary layout: version byte, Int32 count, then the six columns. */
+    /**
+     * Serialises to the versioned binary layout: version byte, three reserved bytes, Int32 count,
+     * then the six columns. The 8-byte header keeps the float data aligned. Direct buffers are used
+     * because their bulk copies are native; heap float views copy one element at a time on Android.
+     */
     fun encode(): ByteArray {
-        val buffer = ByteBuffer.allocate(HEADER_SIZE + data.size * Float.SIZE_BYTES).order(ByteOrder.LITTLE_ENDIAN)
+        val size = HEADER_SIZE + data.size * Float.SIZE_BYTES
+        val buffer = ByteBuffer.allocateDirect(size).order(ByteOrder.LITTLE_ENDIAN)
         buffer.put(FORMAT_VERSION)
+        buffer.put(0).put(0).put(0)
         buffer.putInt(count)
         buffer.asFloatBuffer().put(data)
-        return buffer.array()
+        val bytes = ByteArray(size)
+        buffer.rewind()
+        buffer.get(bytes)
+        return bytes
     }
 
     override fun equals(other: Any?): Boolean =
@@ -43,7 +52,8 @@ class StrokePoints private constructor(
     companion object {
         const val FORMAT_VERSION: Byte = 1
         private const val COLUMNS = 6
-        private const val HEADER_SIZE = 1 + Int.SIZE_BYTES
+        private const val HEADER_SIZE = 8
+        private const val COUNT_OFFSET = 4
 
         val EMPTY: StrokePoints = StrokePoints(0, FloatArray(0))
 
@@ -72,9 +82,11 @@ class StrokePoints private constructor(
 
         fun decode(bytes: ByteArray): StrokePoints {
             require(bytes.size >= HEADER_SIZE) { "Stroke points data is truncated (${bytes.size} bytes)" }
-            val buffer = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
-            val version = buffer.get()
+            val version = bytes[0]
             require(version == FORMAT_VERSION) { "Unsupported stroke points format version $version" }
+            val buffer = ByteBuffer.allocateDirect(bytes.size).order(ByteOrder.LITTLE_ENDIAN)
+            buffer.put(bytes)
+            buffer.position(COUNT_OFFSET)
             val count = buffer.getInt()
             require(count >= 0 && bytes.size == HEADER_SIZE + count * COLUMNS * Float.SIZE_BYTES) {
                 "Stroke points data is truncated or corrupt (count=$count, ${bytes.size} bytes)"

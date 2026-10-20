@@ -9,6 +9,12 @@ interface MetaDao {
     @Query("SELECT meta_value FROM meta WHERE meta_key = :key")
     suspend fun get(key: String): String?
 
+    @Query("SELECT * FROM meta")
+    suspend fun getAll(): List<MetaEntity>
+
     @Upsert
     suspend fun upsert(entity: MetaEntity)
+
+    @Upsert
+    suspend fun upsertAll(entities: List<MetaEntity>)
 }
