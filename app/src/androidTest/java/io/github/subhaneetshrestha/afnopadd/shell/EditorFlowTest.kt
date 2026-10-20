@@ -3,6 +3,7 @@ package io.github.subhaneetshrestha.afnopadd.shell
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -140,6 +141,7 @@ class EditorFlowTest {
     fun theEraserRemovesATouchedStrokeAndUndoBringsItBack() {
         val sheet = createSheetAndDraw()
         composeRule.onNodeWithTag(io.github.subhaneetshrestha.afnopadd.tools.ToolbarTags.item("tool:eraser")).performClick()
+        composeRule.waitForIdle()
         // Miss first: a swipe well away from the stroke erases nothing.
         composeRule.onNodeWithTag(ShellTags.EDITOR_CANVAS).performTouchInput {
             down(Offset(600f, 150f))
@@ -161,6 +163,25 @@ class EditorFlowTest {
         composeRule.onNodeWithContentDescription(context.getString(R.string.command_undo)).performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) { strokeCount(sheet) == 1 }
         leaveEditor()
+    }
+
+    /** Resizing Ink's wet-stroke view can crash its render thread (ADR 0003), so tool switches must not. */
+    @Test
+    fun switchingToolsNeverResizesTheCanvas() {
+        composeRule.onNodeWithTag(LibraryTags.NEW_SHEET).performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            composeRule.onAllNodesWithTag(ShellTags.EDITOR_CANVAS).fetchSemanticsNodes().isNotEmpty()
+        }
+        val withPen =composeRule.onNodeWithTag(ShellTags.EDITOR_CANVAS).fetchSemanticsNode().boundsInRoot
+
+        // The eraser has no stroke options, so its options bar disappears.
+        composeRule.onNodeWithTag(io.github.subhaneetshrestha.afnopadd.tools.ToolbarTags.item("tool:eraser")).performClick()
+        composeRule.waitForIdle()
+        assertEquals(withPen, composeRule.onNodeWithTag(ShellTags.EDITOR_CANVAS).fetchSemanticsNode().boundsInRoot)
+
+        composeRule.onNodeWithTag(io.github.subhaneetshrestha.afnopadd.tools.ToolbarTags.item("tool:pen")).performClick()
+        composeRule.waitForIdle()
+        assertEquals(withPen, composeRule.onNodeWithTag(ShellTags.EDITOR_CANVAS).fetchSemanticsNode().boundsInRoot)
     }
 
     @Test

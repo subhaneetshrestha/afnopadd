@@ -470,8 +470,11 @@ Done 2026-10-20.
 **Description:** About 1 in 5 runs of `EditorFlowTest` on `afnopadd36` ends with a native crash: `SIGSEGV` in `libhwui.so` (`DrawFrameTask::postAndWait`, fault address `0x63e8`) on the app's RenderThread, while a test leaves the editor. The backtrace has no Ink frames, but the editor hosts Ink's `InProgressStrokesView`, whose API 33+ path drives its own `HardwareRenderer`/`SurfaceControl`; the suspicion is that it is released while a frame is still posted. First seen during Task 16; not seen in about eight earlier full runs, though more tests now leave the editor. Find whether it reproduces on a real device, whether Ink 1.1 changes it, and whether flushing or cancelling Ink strokes before release prevents it.
 
 **Acceptance criteria:**
-- [ ] Root cause identified (our teardown order, androidx.graphics/Ink, or emulator GPU emulation) and recorded in an ADR or this task.
-- [ ] If it is ours or avoidable, `EditorFlowTest` runs ten times in a row with no native crash.
+- [x] Root cause identified and recorded in `docs/adr/0003-fixed-size-ink-surface.md`: Jetpack Ink 1.0.0's `InProgressStrokesView` races when resized (its render helper draws into a torn-down viewport: `IllegalStateException` in `CanvasInProgressStrokesRenderHelperV33`, or the libhwui SIGSEGV). The editor resized it on every tool switch that showed or hid the options bar.
+- [x] Avoided: the canvas keeps a fixed size and the bars float over it (`switchingToolsNeverResizesTheCanvas` guards it). `EditorFlowTest` then ran ten times in a row with no native crash and no failure (70 test executions, 2026-10-20).
+- [x] Found on the way: Ink starts a render-helper thread per view and never quits it (30 threads after 30 editor visits). Fixed with `SharedInkView` (one view per activity); `InkThreadLeakTest` guards it; numbers in `docs/perf/PERF.md`.
+
+Done 2026-10-20.
 
 Evidence from Task 17 (2026-10-20): with three emulators on a 15 GB host the crash hit every `EditorFlowTest` run, mid-editor as well as on leaving (fault address `0x63e8` or `0x6348`, frames of 1 to 3 s); after the other emulators were shut down and `afnopadd36` cold-booted, three runs had no crash. The router listener leak fixed in the performance review (replaced `WetStrokeRouter`s stayed registered on the Ink view) may also have contributed.
 

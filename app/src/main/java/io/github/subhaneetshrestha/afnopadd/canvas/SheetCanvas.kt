@@ -17,9 +17,9 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.ink.authoring.InProgressStrokesView
 import io.github.subhaneetshrestha.afnopadd.canvas.internal.BackgroundPainter.drawBackground
 import io.github.subhaneetshrestha.afnopadd.canvas.internal.DryLayer
+import io.github.subhaneetshrestha.afnopadd.canvas.internal.SharedInkView
 import io.github.subhaneetshrestha.afnopadd.canvas.internal.WetStrokeRouter
 import io.github.subhaneetshrestha.afnopadd.canvas.internal.canvasGestures
 import io.github.subhaneetshrestha.afnopadd.document.BrushSpec
@@ -87,16 +87,13 @@ fun SheetCanvas(
         // Jetpack Ink's low-latency wet-stroke layer. It never handles touch itself; the gesture
         // handler above feeds it through the router so pinch and finger policy stay ours.
         AndroidView(
-            factory = { context ->
-                InProgressStrokesView(context).apply {
-                    isClickable = false
-                    isFocusable = false
-                    eagerInit()
-                }
-            },
+            factory = { context -> SharedInkView.obtain(context) },
             modifier = Modifier.fillMaxSize(),
             update = { view -> router.view = view },
-            onRelease = { router.view = null },
+            onRelease = { view ->
+                router.view = null
+                SharedInkView.release(view)
+            },
         )
     }
 }

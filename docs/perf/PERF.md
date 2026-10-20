@@ -53,6 +53,32 @@ frame re-tessellated almost every stroke. The budget also undercounted real memo
 | Culling (index query), median | 0.26–0.42 ms |
 | `SoftwareRenderer` retained after a thumbnail | 4 MB |
 
+## 2026-10-20: editor-session leak hunt
+
+Method: drive the installed debug build from outside with adb (open a sheet, draw, switch pencil,
+eraser, pen, press back), 30 sessions, sampling `dumpsys meminfo`, the process's open file
+descriptors, its threads, and the emulator's host memory every 10 sessions. (The same loop through
+`createAndroidComposeRule` hit a test-harness error, "performMeasureAndLayout called during
+measure layout", so the app is driven from outside instead.)
+
+| Metric over sessions 10 → 30 | Before | After |
+|---|---|---|
+| Ink `CanvasInProgressStrokesRenderHelperV33` threads | +1 per session (30 after 30) | 1 in total |
+| Open file descriptors, reopening one sheet | +2 per session (eventfd + epoll of each leaked looper) | flat (176 → 175) |
+| Open file descriptors, a new sheet each time | +4.5 per session | +2 per session, from library thumbnails |
+| Total PSS, reopening one sheet | 128 → 124 MB | 136 → 127 MB |
+| Sheet databases left open | 0 | 0 |
+
+| Idea | Baseline → result | Verdict | Why |
+|---|---|---|---|
+| Share one `InProgressStrokesView` per process (application context) | threads 11 → 1 in `InkThreadLeakTest` | rejected | A view attached to one activity's window stops finishing strokes in the next; every later `EditorFlowTest` test timed out waiting for its stroke. |
+| Share one `InProgressStrokesView` per activity (`SharedInkView`), dropped on `ON_DESTROY` | threads +1 per session → 1 in total; reused view still draws | kept | Works around Ink 1.0.0 never quitting its render-helper `HandlerThread`; an activity recreation still costs one thread. |
+| Close the sheet from the coroutine that opened it (`EditorScreen`) | no leak measured either way | kept | Removes a window where leaving the editor between the open finishing and the screen showing the sheet left its database open; correct by construction, not reproduced by a test. |
+
+The emulator's own host memory (`qemu-system-x86_64`) grew to 7.3 GB over a day of test runs; it
+stayed flat within these loops, so that growth is the emulator's, not the app's. Restart it cold
+(`-no-snapshot-load`) when it passes about 6 GB.
+
 ### Open gaps (not fixed here)
 
 - **Overview of a full sheet is still 120+ ms per frame.** 5,000 path draws per frame is too many for

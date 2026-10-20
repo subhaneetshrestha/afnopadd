@@ -3,9 +3,12 @@ package io.github.subhaneetshrestha.afnopadd.shell
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -47,6 +50,7 @@ import io.github.subhaneetshrestha.afnopadd.tools.options.StrokeOptionsBar
 import io.github.subhaneetshrestha.afnopadd.tools.presets.BuiltInPresets
 import io.github.subhaneetshrestha.afnopadd.tools.presets.BuiltInTools
 import io.github.subhaneetshrestha.afnopadd.tools.stroke.StrokeTool
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -63,25 +67,26 @@ fun EditorScreen(sheetId: String, modifier: Modifier = Modifier) {
     var failed by remember(sheetId) { mutableStateOf(false) }
 
     LaunchedEffect(sheetId) {
-        try {
-            sheet = container.sheetStore.open(File(sheetsRoot(context), sheetId))
-            container.library.markOpened(SheetId(sheetId))
+        val opened = try {
+            container.sheetStore.open(File(sheetsRoot(context), sheetId))
         } catch (e: SheetFormatException) {
             Log.w("EditorScreen", "Could not open sheet $sheetId", e)
             failed = true
+            return@LaunchedEffect
         }
-    }
-    DisposableEffect(sheet) {
-        val open = sheet
-        onDispose {
-            open?.let {
-                val snapshot = it.snapshot.value
-                val updatedAt = it.meta.value.updatedAt
-                container.appScope.launch {
-                    it.close()
-                    container.thumbnails.update(File(sheetsRoot(context), sheetId), snapshot, updatedAt)
-                    container.library.refresh(SheetId(sheetId))
-                }
+        // The sheet is closed by the coroutine that opened it, so leaving the editor at any moment,
+        // even between the open finishing and the screen showing the sheet, still releases its database.
+        try {
+            sheet = opened
+            container.library.markOpened(SheetId(sheetId))
+            awaitCancellation()
+        } finally {
+            val snapshot = opened.snapshot.value
+            val updatedAt = opened.meta.value.updatedAt
+            container.appScope.launch {
+                opened.close()
+                container.thumbnails.update(File(sheetsRoot(context), sheetId), snapshot, updatedAt)
+                container.library.refresh(SheetId(sheetId))
             }
         }
     }
@@ -143,10 +148,23 @@ private fun EditorContent(sheet: Sheet, modifier: Modifier) {
         ToolbarSpecJson.parse(context.assets.open(DEFAULT_LAYOUT_ASSET).bufferedReader().use { it.readText() })
     }
 
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        bottomBar = {
-            Column {
+    // The canvas always fills the editor and the bars float over it. Resizing the canvas resizes
+    // Jetpack Ink's InProgressStrokesView, and Ink 1.0.0 can then crash its render thread (an
+    // IllegalStateException in CanvasInProgressStrokesRenderHelperV33, or a SIGSEGV in libhwui);
+    // the options bar appearing and disappearing on tool switches did exactly that (ADR 0003).
+    Box(modifier = modifier.fillMaxSize()) {
+        SheetCanvas(
+            sheet = sheet,
+            cameraController = camera,
+            inputSink = controller,
+            modifier = Modifier.fillMaxSize().statusBarsPadding().testTag(ShellTags.EDITOR_CANVAS),
+            wetStrokeBrush = controller::wetStrokeBrush,
+            index = index,
+            hiddenElements = hiddenElements,
+        )
+        // A Surface paints the bars' background and keeps touches on them from reaching the canvas.
+        Surface(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(), tonalElevation = 3.dp) {
+            Column(modifier = Modifier.navigationBarsPadding()) {
                 if (ToolCapability.STROKE in activeTool.capabilities) {
                     val style = styleMap[activeTool.id] ?: styles.styleFor(activeTool.id)
                     StrokeOptionsBar(
@@ -170,17 +188,7 @@ private fun EditorContent(sheet: Sheet, modifier: Modifier) {
                 }
                 ToolbarHost(spec = spec, registry = registry, commands = commands, state = toolbarState)
             }
-        },
-    ) { innerPadding ->
-        SheetCanvas(
-            sheet = sheet,
-            cameraController = camera,
-            inputSink = controller,
-            modifier = Modifier.fillMaxSize().padding(innerPadding).testTag(ShellTags.EDITOR_CANVAS),
-            wetStrokeBrush = controller::wetStrokeBrush,
-            index = index,
-            hiddenElements = hiddenElements,
-        )
+        }
     }
 }
 
