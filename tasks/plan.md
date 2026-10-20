@@ -45,7 +45,7 @@ T1 build plumbing ─┬─ T2 app shell skeleton ──────────
 - [x] `.\gradlew.bat check` green; Room round trip of 5,000 strokes passes; crash test passes
 
 - [x] Task 7: Camera model and canvas math (2026-10-20)
-- [ ] Task 8: SheetCanvas composable with pan, pinch, background
+- [x] Task 8: SheetCanvas composable with pan, pinch, background (2026-10-20)
 - [ ] Task 9: Ink wet strokes (InProgressStrokes) with frame transform
 - [ ] Task 10: Dry stroke rendering with same-frame handoff
 - [ ] Task 11: Pen tool, registries, JSON toolbar, editor wiring

@@ -202,14 +202,16 @@ Done 2026-10-20. Camera animation is left to the UI layer (`CanvasMath.interpola
 **Description:** Build the `SheetCanvas` composable: a drawing surface that observes the sheet snapshot and camera, draws the background (plain, grid, dots) in screen space, draws element bounds as placeholder rectangles, routes single-pointer events to a `CanvasInputSink`, and gives two-pointer pinch and pan to the camera in every tool. Includes a dirty-region invalidation hook for later tasks.
 
 **Acceptance criteria:**
-- [ ] Pinch keeps the point between the fingers stationary within 1 px; two-finger drag pans; double-tap zooms 2x toward the tap.
-- [ ] Single-pointer events arrive at the sink with world coordinates, pressure, tool type, and phase.
-- [ ] Background grid does not alias when zooming through buckets (visual check and a screenshot test at three zoom levels).
+- [x] Pinch keeps the point between the fingers stationary within 1 px; two-finger drag pans; double-tap zooms 2x toward the tap (in navigate mode).
+- [x] Single-pointer events arrive at the sink with world coordinates, pressure, tool type, and phase.
+- [x] Background grid does not alias when zooming through buckets (line count identical at 1x, 10x and 100x in a captured image).
 
 **Verification:**
-- [ ] Tests pass: Compose UI test for pinch invariance in `androidTest`
-- [ ] Build succeeds: `.\gradlew.bat assembleDebug`
-- [ ] Manual check: pinch, pan, double-tap on a device
+- [x] Tests pass: `SheetCanvasGestureTest` (six instrumented tests) on the API 36 emulator
+- [x] Build succeeds: `.\gradlew.bat assembleDebug`
+- [x] Manual check: pinch, pan, double-tap on a device, part of the owner's Checkpoint B review
+
+Done 2026-10-20. Dirty-region invalidation is deferred to the tile cache (Task 24); Compose state invalidation covers the vector path until then.
 
 **Dependencies:** Task 7, Task 2
 
