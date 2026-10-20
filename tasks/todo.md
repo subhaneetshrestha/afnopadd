@@ -349,7 +349,7 @@ Done 2026-10-20.
 - [x] Build succeeds: `.\gradlew.bat assembleDebug`
 - [x] Manual check: none
 
-Done 2026-10-20. `SheetStore` gained `create(..., id)`, `inspect` and `duplicate` so the library never touches sheet internals. Environment note: the full instrumented suite was not green at commit time because another session's app held the foreground on the shared emulator (two `createComposeRule` tests lost focus; the 5,000-stroke open measured 1.2 s instead of 0.8 s). Those tests passed on every earlier run.
+Done 2026-10-20. `SheetStore` gained `create(..., id)`, `inspect` and `duplicate` so the library never touches sheet internals. Environment note: the full instrumented suite failed once at commit time because another session's app held the foreground on the shared emulator. The owner chose a dedicated AVD (`afnopadd36`, `emulator-5560`); the full suite of 41 instrumented tests is green there (open 5,000 strokes 482 ms, stroke commit 3.9 ms median, duplicate 71 ms).
 
 **Dependencies:** Task 6
 

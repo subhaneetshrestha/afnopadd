@@ -54,7 +54,8 @@ Run from the project root in PowerShell. The wrapper finds Java on PATH (mise-ma
 .\gradlew.bat testDebugUnitTest                  # JVM unit tests (fast; run before every commit)
 .\gradlew.bat lintDebug                          # Android Lint; warnings are errors
 .\gradlew.bat check                              # lint + unit tests (the pre-commit gate)
-.\gradlew.bat connectedDebugAndroidTest          # Instrumented tests on a connected device/emulator
+$env:ANDROID_SERIAL = 'emulator-5560'            # Pin Gradle to Afnopadd's own AVD (afnopadd36); other emulators belong to other projects
+.\gradlew.bat connectedDebugAndroidTest          # Instrumented tests on the pinned device
 .\gradlew.bat installDebug                       # Install on the connected device
 adb shell am start -n io.github.subhaneetshrestha.afnopadd/.MainActivity
 .\gradlew.bat assembleRelease                    # Unsigned release build (F-Droid builds and signs from source)
