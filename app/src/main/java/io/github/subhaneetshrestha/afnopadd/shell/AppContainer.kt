@@ -2,6 +2,8 @@ package io.github.subhaneetshrestha.afnopadd.shell
 
 import android.content.Context
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.datastore.preferences.preferencesDataStore
+import io.github.subhaneetshrestha.afnopadd.tools.color.RecentColorsStore
 import io.github.subhaneetshrestha.afnopadd.R
 import io.github.subhaneetshrestha.afnopadd.canvas.Renderer
 import io.github.subhaneetshrestha.afnopadd.canvas.SoftwareRenderer
@@ -35,6 +37,8 @@ class AppContainer(val applicationContext: Context) {
     /** Per-tool colour and width, kept for the whole session so they carry across sheets. */
     val toolStyles: ToolStyles = ToolStyles(BuiltInPresets.defaultStyles)
 
+    val recentColors: RecentColorsStore by lazy { RecentColorsStore(applicationContext.settingsDataStore) }
+
     val library: SheetLibrary by lazy {
         RoomSheetLibrary(
             store = sheetStore,
@@ -46,6 +50,9 @@ class AppContainer(val applicationContext: Context) {
         )
     }
 }
+
+/** The app's single preferences file (recent colours now; settings in Task 19). */
+private val Context.settingsDataStore by preferencesDataStore(name = "settings")
 
 val LocalAppContainer = staticCompositionLocalOf<AppContainer> {
     error("No AppContainer provided; wrap the content in CompositionLocalProvider(LocalAppContainer provides ...)")

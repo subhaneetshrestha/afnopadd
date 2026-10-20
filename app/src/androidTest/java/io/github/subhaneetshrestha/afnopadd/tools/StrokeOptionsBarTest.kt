@@ -27,7 +27,7 @@ class StrokeOptionsBarTest {
         var reported = 0f
         rule.setContent {
             var width by remember { mutableFloatStateOf(4f) }
-            StrokeOptionsBar(widthPx = width, onWidthChange = { width = it; reported = it })
+            StrokeOptionsBar(widthPx = width, onWidthChange = { width = it; reported = it }, colorArgb = 0xFF000000, onColorClick = {})
         }
 
         rule.onNodeWithTag(StrokeOptionsTags.preset(4f)).assertIsSelected()
@@ -37,5 +37,17 @@ class StrokeOptionsBarTest {
         assertEquals(16f, reported, 0f)
         rule.onNodeWithTag(StrokeOptionsTags.preset(16f)).assertIsSelected()
         rule.onNodeWithTag(StrokeOptionsTags.SLIDER).assertExists()
+    }
+
+    @Test
+    fun theColourButtonOpensThePicker() {
+        var opened = 0
+        rule.setContent {
+            StrokeOptionsBar(widthPx = 4f, onWidthChange = {}, colorArgb = 0xFFFF0000, onColorClick = { opened++ })
+        }
+
+        rule.onNodeWithTag(StrokeOptionsTags.COLOR).performClick()
+
+        assertEquals(1, opened)
     }
 }

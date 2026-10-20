@@ -14,6 +14,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,6 +38,7 @@ import io.github.subhaneetshrestha.afnopadd.tools.ToolbarHost
 import io.github.subhaneetshrestha.afnopadd.tools.ToolbarSpec
 import io.github.subhaneetshrestha.afnopadd.tools.ToolbarSpecJson
 import io.github.subhaneetshrestha.afnopadd.tools.ToolbarState
+import io.github.subhaneetshrestha.afnopadd.tools.color.ColorPickerDialog
 import io.github.subhaneetshrestha.afnopadd.tools.options.StrokeOptionsBar
 import io.github.subhaneetshrestha.afnopadd.tools.presets.BuiltInPresets
 import io.github.subhaneetshrestha.afnopadd.tools.presets.BuiltInTools
@@ -109,6 +111,10 @@ private fun EditorContent(sheet: Sheet, modifier: Modifier) {
     val activeTool = registry.get(activeToolId) ?: registry.get(BuiltInTools.PEN)!!
     val controller = remember(activeTool, toolContext) { activeTool.createController(toolContext) }
     val styleMap by styles.styles.collectAsState()
+    val container = LocalAppContainer.current
+    val recentColors by container.recentColors.colors.collectAsState(initial = emptyList())
+    var pickingColor by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     DisposableEffect(controller) {
         controller.onActivated()
         onDispose { controller.onDeactivated() }
@@ -128,10 +134,25 @@ private fun EditorContent(sheet: Sheet, modifier: Modifier) {
         bottomBar = {
             Column {
                 if (ToolCapability.STROKE in activeTool.capabilities) {
+                    val style = styleMap[activeTool.id] ?: styles.styleFor(activeTool.id)
                     StrokeOptionsBar(
-                        widthPx = styleMap[activeTool.id]?.widthPx ?: styles.styleFor(activeTool.id).widthPx,
+                        widthPx = style.widthPx,
                         onWidthChange = { width -> styles.update(activeTool.id) { it.copy(widthPx = width) } },
+                        colorArgb = style.colorArgb,
+                        onColorClick = { pickingColor = true },
                     )
+                    if (pickingColor) {
+                        ColorPickerDialog(
+                            initial = style.colorArgb,
+                            recents = recentColors,
+                            onPick = { color ->
+                                pickingColor = false
+                                styles.update(activeTool.id) { it.copy(colorArgb = color) }
+                                scope.launch { container.recentColors.add(color) }
+                            },
+                            onDismiss = { pickingColor = false },
+                        )
+                    }
                 }
                 ToolbarHost(spec = spec, registry = registry, commands = commands, state = toolbarState)
             }

@@ -110,6 +110,33 @@ class EditorFlowTest {
     }
 
     @Test
+    fun aColourPickedFromThePaletteIsUsedForTheNextStroke() {
+        val red = io.github.subhaneetshrestha.afnopadd.tools.color.ColorPalette.SWATCHES[4]
+        composeRule.onNodeWithTag(LibraryTags.NEW_SHEET).performClick()
+        composeRule.onNodeWithTag(ShellTags.EDITOR_CANVAS).assertIsDisplayed()
+        composeRule.waitUntil(timeoutMillis = 5_000) { lastOpened() != null }
+        val sheet = lastOpened()!!
+        composeRule.onNodeWithTag(io.github.subhaneetshrestha.afnopadd.tools.options.StrokeOptionsTags.COLOR).performClick()
+        composeRule.onNodeWithTag(io.github.subhaneetshrestha.afnopadd.tools.color.ColorPickerTags.swatch(red)).performClick()
+        composeRule.onNodeWithTag(ShellTags.EDITOR_CANVAS).performTouchInput {
+            down(Offset(200f, 400f))
+            moveTo(Offset(400f, 500f))
+            up()
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { strokeCount(sheet) == 1 }
+        leaveEditor()
+
+        val opened = runBlocking { container.sheetStore.open(sheet.dir) }
+        try {
+            val stroke = opened.snapshot.value.elements.values.single() as io.github.subhaneetshrestha.afnopadd.document.StrokeElement
+            assertEquals(red, stroke.brush.colorArgb)
+        } finally {
+            runBlocking { opened.close() }
+        }
+        assertEquals(red, runBlocking { container.recentColors.colors.first() }.first())
+    }
+
+    @Test
     fun undoRemovesTheStrokeBeforeLeaving() {
         val sheet = createSheetAndDraw()
         composeRule.onNodeWithContentDescription(context.getString(R.string.command_undo)).performClick()

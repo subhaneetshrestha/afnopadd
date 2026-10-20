@@ -25,6 +25,12 @@
     <string name="editor_loading">Opening sheet…</string>
     <string name="editor_open_failed">This sheet could not be opened.</string>
 
+    <!-- Colour -->
+    <string name="color_title">Colour</string>
+    <string name="color_recent">Recent</string>
+    <string name="color_hex">Hex</string>
+    <string name="action_apply">Apply</string>
+
     <!-- Tools and commands -->
     <string name="tool_pen">Pen</string>
     <string name="tool_pencil">Pencil</string>

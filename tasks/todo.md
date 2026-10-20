@@ -445,14 +445,28 @@ Done 2026-10-20. The four tools are `ToolPreset`s of one `StrokeTool`, which is 
 **Description:** Build the colour UI: 16-swatch palette, HSV picker with hex entry, eight recents persisted in DataStore, highlighter alpha forcing, and the toolbar colour button that opens it.
 
 **Acceptance criteria:**
-- [ ] Picking a swatch or entering a hex value updates `CurrentStyle` for the active tool and the next stroke uses it.
-- [ ] Recents hold the last eight distinct colours across process restarts.
-- [ ] The highlighter ignores the chosen alpha and applies its fixed 40 percent.
+- [x] Picking a swatch or entering a hex value updates the active tool's style and the next stroke uses it.
+- [x] Recents hold the last eight distinct colours across process restarts (DataStore `settings`).
+- [x] The highlighter ignores the chosen alpha and applies its fixed 40 percent (covered in `StrokeToolTest`).
 
 **Verification:**
-- [ ] Tests pass: unit tests for recents and hex parsing; Compose UI test for the picker
-- [ ] Build succeeds: `.\gradlew.bat assembleDebug`
-- [ ] Manual check: pick colours, restart, confirm recents
+- [x] Tests pass: `ColorLogicTest` (JVM: hex, HSV, palette, recents), `ColorPickerTest`, `RecentColorsStoreTest` (on device, because DataStore's atomic rename cannot overwrite on a Windows host JVM), `StrokeOptionsBarTest`, and the palette case in `EditorFlowTest`; full suite of 59 instrumented tests green
+- [x] Build succeeds: `.\gradlew.bat assembleDebug`
+- [ ] Manual check: pick colours, restart, confirm recents (owner)
+
+Done 2026-10-20.
+
+---
+
+## Task 16b: Investigate the render-thread crash when leaving the editor
+
+**Description:** About 1 in 5 runs of `EditorFlowTest` on `afnopadd36` ends with a native crash: `SIGSEGV` in `libhwui.so` (`DrawFrameTask::postAndWait`, fault address `0x63e8`) on the app's RenderThread, while a test leaves the editor. The backtrace has no Ink frames, but the editor hosts Ink's `InProgressStrokesView`, whose API 33+ path drives its own `HardwareRenderer`/`SurfaceControl`; the suspicion is that it is released while a frame is still posted. First seen during Task 16; not seen in about eight earlier full runs, though more tests now leave the editor. Find whether it reproduces on a real device, whether Ink 1.1 changes it, and whether flushing or cancelling Ink strokes before release prevents it.
+
+**Acceptance criteria:**
+- [ ] Root cause identified (our teardown order, androidx.graphics/Ink, or emulator GPU emulation) and recorded in an ADR or this task.
+- [ ] If it is ours or avoidable, `EditorFlowTest` runs ten times in a row with no native crash.
+
+**Dependencies:** Task 16. **Priority:** before Checkpoint C.
 
 **Dependencies:** Task 15
 
