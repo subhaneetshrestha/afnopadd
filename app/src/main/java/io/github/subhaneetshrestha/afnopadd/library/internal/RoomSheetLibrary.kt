@@ -129,8 +129,15 @@ internal class RoomSheetLibrary(
         restored
     }
 
-    override suspend fun refresh(id: SheetId) = mutex.withLock {
-        val row = dao.get(id.value) ?: return@withLock
+    override suspend fun refresh(id: SheetId) = mutex.withLock { refreshLocked(id) }
+
+    override suspend fun closeEditing(id: SheetId, close: suspend (dir: File) -> Unit) = mutex.withLock {
+        close(File(root, dao.get(id.value)?.dirName ?: id.value))
+        refreshLocked(id)
+    }
+
+    private suspend fun refreshLocked(id: SheetId) {
+        val row = dao.get(id.value) ?: return
         val info = store.inspect(File(root, row.dirName))
         dao.upsert(row.copy(title = info.meta.title, updatedAt = info.meta.updatedAt, elementCount = info.elementCount, thumbPath = thumbPathFor(row.dirName)))
     }

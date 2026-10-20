@@ -1,5 +1,6 @@
 package io.github.subhaneetshrestha.afnopadd.shell
 
+import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,6 +19,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -26,6 +29,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.subhaneetshrestha.afnopadd.R
+import io.github.subhaneetshrestha.afnopadd.canvas.Camera
 import io.github.subhaneetshrestha.afnopadd.canvas.CameraController
 import io.github.subhaneetshrestha.afnopadd.canvas.ElementIndex
 import io.github.subhaneetshrestha.afnopadd.canvas.SheetCanvas
@@ -35,6 +39,7 @@ import android.util.Log
 import io.github.subhaneetshrestha.afnopadd.document.Sheet
 import io.github.subhaneetshrestha.afnopadd.document.SheetFormatException
 import io.github.subhaneetshrestha.afnopadd.document.SheetId
+import io.github.subhaneetshrestha.afnopadd.document.WorldPoint
 import io.github.subhaneetshrestha.afnopadd.tools.Command
 import io.github.subhaneetshrestha.afnopadd.tools.CommandRegistry
 import io.github.subhaneetshrestha.afnopadd.tools.ToolCapability
@@ -50,25 +55,31 @@ import io.github.subhaneetshrestha.afnopadd.tools.options.StrokeOptionsBar
 import io.github.subhaneetshrestha.afnopadd.tools.presets.BuiltInPresets
 import io.github.subhaneetshrestha.afnopadd.tools.presets.BuiltInTools
 import io.github.subhaneetshrestha.afnopadd.tools.stroke.StrokeTool
-import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
 import java.io.File
 
 /**
  * The editor: opens the sheet, wires the tool and command registries to the canvas and toolbar,
  * marks it opened in the library, and closes it (flush, compaction, asset garbage collection)
- * when it leaves composition, then refreshes its library entry.
+ * when it leaves composition, then refreshes its library entry. When it leaves only because the
+ * activity is being recreated, the sheet and camera stay open in [EditorSessions] and the new
+ * editor continues with them; the camera and tool are also saved for process death.
  */
 @Composable
 fun EditorScreen(sheetId: String, modifier: Modifier = Modifier) {
     val container = LocalAppContainer.current
     val context = LocalContext.current
-    var sheet by remember(sheetId) { mutableStateOf<Sheet?>(null) }
+    val activity = LocalActivity.current
+    val cameraMemory = rememberSaveable(sheetId, saver = CameraMemory.Saver) { CameraMemory() }
+    var session by remember(sheetId) { mutableStateOf<EditorSessions.Session?>(null) }
     var failed by remember(sheetId) { mutableStateOf(false) }
 
     LaunchedEffect(sheetId) {
-        val opened = try {
-            container.sheetStore.open(File(sheetsRoot(context), sheetId))
+        val current = container.editorSessions.get(sheetId) ?: try {
+            val opened = container.sheetStore.open(File(sheetsRoot(context), sheetId))
+            EditorSessions.Session(opened, CameraController(cameraMemory.camera ?: Camera.DEFAULT)).also {
+                container.editorSessions.put(sheetId, it)
+            }
         } catch (e: SheetFormatException) {
             Log.w("EditorScreen", "Could not open sheet $sheetId", e)
             failed = true
@@ -77,16 +88,21 @@ fun EditorScreen(sheetId: String, modifier: Modifier = Modifier) {
         // The sheet is closed by the coroutine that opened it, so leaving the editor at any moment,
         // even between the open finishing and the screen showing the sheet, still releases its database.
         try {
-            sheet = opened
+            session = current
             container.library.markOpened(SheetId(sheetId))
-            awaitCancellation()
+            current.camera.camera.collect { cameraMemory.camera = it }
         } finally {
-            val snapshot = opened.snapshot.value
-            val updatedAt = opened.meta.value.updatedAt
-            container.appScope.launch {
-                opened.close()
-                container.thumbnails.update(File(sheetsRoot(context), sheetId), snapshot, updatedAt)
-                container.library.refresh(SheetId(sheetId))
+            if (activity?.isChangingConfigurations != true) {
+                container.editorSessions.remove(sheetId)
+                val opened = current.sheet
+                val snapshot = opened.snapshot.value
+                val updatedAt = opened.meta.value.updatedAt
+                container.appScope.launch {
+                    container.library.closeEditing(SheetId(sheetId)) { dir ->
+                        opened.close()
+                        container.thumbnails.update(dir, snapshot, updatedAt)
+                    }
+                }
             }
         }
     }
@@ -97,7 +113,7 @@ fun EditorScreen(sheetId: String, modifier: Modifier = Modifier) {
         }
         return
     }
-    val current = sheet
+    val current = session
     if (current == null) {
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator()
@@ -105,14 +121,23 @@ fun EditorScreen(sheetId: String, modifier: Modifier = Modifier) {
         }
         return
     }
-    EditorContent(current, modifier)
+    EditorContent(current.sheet, current.camera, modifier)
+}
+
+/** The camera last seen by the editor, kept in saved state so a process restart reopens the sheet where it was. */
+private class CameraMemory(var camera: Camera? = null) {
+    companion object {
+        val Saver = Saver<CameraMemory, DoubleArray>(
+            save = { memory -> memory.camera?.let { doubleArrayOf(it.center.x, it.center.y, it.zoom) } ?: doubleArrayOf() },
+            restore = { values -> CameraMemory(if (values.size == 3) Camera(WorldPoint(values[0], values[1]), values[2]) else null) },
+        )
+    }
 }
 
 @Composable
-private fun EditorContent(sheet: Sheet, modifier: Modifier) {
+private fun EditorContent(sheet: Sheet, camera: CameraController, modifier: Modifier) {
     val context = LocalContext.current
     val styles = LocalAppContainer.current.toolStyles
-    val camera = remember(sheet) { CameraController() }
     // One index serves both the canvas's culling and the tools' hit-testing.
     val index = remember(sheet) { ElementIndex() }
     val toolContext = remember(sheet) {
@@ -124,8 +149,11 @@ private fun EditorContent(sheet: Sheet, modifier: Modifier) {
             register(EraserTool())
         }
     }
-    val toolbarState = remember { ToolbarState(initialToolId = BuiltInTools.PEN) }
+    // The selected tool survives rotation and process death with the rest of the editor's saved state.
+    var savedToolId by rememberSaveable { mutableStateOf(BuiltInTools.PEN) }
+    val toolbarState = remember { ToolbarState(initialToolId = savedToolId) }
     val activeToolId by toolbarState.activeToolId.collectAsState()
+    LaunchedEffect(activeToolId) { savedToolId = activeToolId }
     val activeTool = registry.get(activeToolId) ?: registry.get(BuiltInTools.PEN)!!
     val controller = remember(activeTool, toolContext) { activeTool.createController(toolContext) }
     val hiddenElements by controller.hiddenElements.collectAsState()

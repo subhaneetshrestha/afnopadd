@@ -822,8 +822,9 @@ Notes: Ink 1.0.0's `ImmutableParallelogram.fromSegmentAndPadding` gives wrong me
 
 **Acceptance criteria:**
 - [ ] Every setting persists across restarts and takes effect without reopening the editor.
-- [ ] `ActivityScenario.recreate()` and the "Don't keep activities" path restore the same sheet, camera, tool, and selection.
+- [ ] `ActivityScenario.recreate()` and the "Don't keep activities" path restore the same sheet, camera, tool, and selection. (Partly done early from the 2026-10-20 review: `EditorSessions` keeps the open sheet, its undo history and camera across recreation, and the camera and tool are saved for process death; `NavigationTest.recreationKeepsTheOpenSheetItsCameraAndTheTool`. Still open: selection, which arrives with Task 20, and a test of the "Don't keep activities" path.)
 - [ ] About shows the GPL-3.0-or-later text link and every dependency from the catalog with its licence.
+- [ ] From the 2026-10-20 review: a process-kill crash test (SPEC success criterion 3), with a writer in a separate debug-only process killed mid-transaction, then a reopen that checks integrity; and instrumented shell tests running against an isolated container or cleared `filesDir` instead of the real one.
 
 **Verification:**
 - [ ] Tests pass: Compose UI tests for settings; instrumented recreate tests

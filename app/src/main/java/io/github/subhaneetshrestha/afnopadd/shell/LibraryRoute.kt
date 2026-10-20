@@ -11,6 +11,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.subhaneetshrestha.afnopadd.document.SheetId
 import io.github.subhaneetshrestha.afnopadd.library.LibraryScreen
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 /** Connects the stateless [LibraryScreen] to the app's sheet library. */
@@ -21,13 +22,15 @@ fun LibraryRoute(onOpenSheet: (SheetId) -> Unit, modifier: Modifier = Modifier) 
     val lastOpened by library.lastOpened.collectAsStateWithLifecycle(initialValue = null)
     val scope = rememberCoroutineScope()
 
+    // A failed library action (an invalid title, a damaged sheet, a full disk) must not take the
+    // menu down with it; the list simply stays as it was.
     fun act(label: String, block: suspend () -> Unit) {
         scope.launch {
             try {
                 block()
-            } catch (e: IllegalArgumentException) {
-                Log.w(TAG, "$label failed", e)
-            } catch (e: java.io.IOException) {
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
                 Log.w(TAG, "$label failed", e)
             }
         }

@@ -10,7 +10,9 @@ import io.github.subhaneetshrestha.afnopadd.document.internal.RoomSheetStore
 import io.github.subhaneetshrestha.afnopadd.library.internal.LibraryDatabase
 import io.github.subhaneetshrestha.afnopadd.library.internal.RoomSheetLibrary
 import io.github.subhaneetshrestha.afnopadd.library.internal.openLibraryDatabase
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import io.github.subhaneetshrestha.afnopadd.PerfBudget
@@ -86,6 +88,36 @@ class SheetLibraryTest {
         assertEquals(listOf(healthy.id), library.sheets.first().map { it.id })
         assertFalse("the broken directory is still in the library root", broken.exists())
         assertTrue("the broken directory was not kept for recovery", File(base, "quarantine/${broken.name}/sheet.db").isFile)
+    }
+
+    @Test
+    fun aDeleteWaitsForTheEditorToFinishClosingTheSheet(): Unit = runBlocking {
+        val library = library()
+        val sheet = library.createSheet("Closing")
+        val closeMayFinish = kotlinx.coroutines.CompletableDeferred<Unit>()
+        var thumbnailWritten = false
+
+        val closing = launch(Dispatchers.IO) {
+            library.closeEditing(sheet.id) { dir ->
+                closeMayFinish.await()
+                // The editor still writes into the sheet's directory here.
+                File(dir, SheetLibrary.THUMBNAIL_FILE_NAME).writeBytes(byteArrayOf(1, 2, 3))
+                thumbnailWritten = true
+            }
+        }
+        while (!closing.isActive) kotlinx.coroutines.delay(5)
+        kotlinx.coroutines.delay(100)
+        val deleting = launch(Dispatchers.IO) { library.delete(sheet.id) }
+        kotlinx.coroutines.delay(200)
+        assertTrue("the delete ran while the editor was still closing", sheet.dir.isDirectory && !deleting.isCompleted)
+
+        closeMayFinish.complete(Unit)
+        closing.join()
+        deleting.join()
+
+        assertTrue(thumbnailWritten)
+        assertFalse(sheet.dir.exists())
+        assertTrue(File(base, "trash/${sheet.id.value}/${SheetLibrary.THUMBNAIL_FILE_NAME}").isFile)
     }
 
     @Test

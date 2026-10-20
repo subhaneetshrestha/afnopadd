@@ -218,6 +218,105 @@ class SheetTransactionsTest {
     }
 
     @Test
+    fun `a closed sheet refuses changes without applying them and closes only once`() {
+        var closes = 0
+        val sheet = SheetImpl(meta = meta, initialElements = emptyList(), writer = writer, onClose = { closes++ })
+        sheet.transact("before") { add(TestElements.stroke(z = FractionalIndex("a0"))) }
+        val before = sheet.snapshot.value
+
+        kotlinx.coroutines.runBlocking {
+            sheet.close()
+            sheet.close()
+        }
+
+        assertEquals(1, closes)
+        assertThrows(IllegalStateException::class.java) { sheet.transact("after") { add(TestElements.stroke(z = FractionalIndex("a1"))) } }
+        assertThrows(IllegalStateException::class.java) { sheet.undo() }
+        assertSame(before, sheet.snapshot.value)
+        assertEquals(1, writer.transactions.size)
+    }
+
+    private fun committed(result: TransactionResult) = (result as TransactionResult.Committed).transaction
+
+    @Test
+    fun `adding then deleting in one transaction cancels out`() {
+        val sheet = newSheet()
+        val element = TestElements.stroke(z = FractionalIndex("a0"))
+
+        val result = sheet.transact("add and delete") {
+            add(element)
+            delete(element.id)
+        }
+
+        assertEquals(TransactionResult.NoChange, result)
+        assertTrue(sheet.snapshot.value.elements.isEmpty())
+        assertTrue(writer.transactions.isEmpty())
+    }
+
+    @Test
+    fun `deleting then adding a changed element in one transaction is a single update undo restores`() {
+        val original = TestElements.stroke(z = FractionalIndex("a0"))
+        val sheet = newSheet(initial = listOf(original))
+        val replacement = original.copy(anchor = WorldPoint(9.0, 9.0))
+
+        val diffs = committed(sheet.transact("replace") {
+            delete(original.id)
+            add(replacement)
+        }).diffs
+
+        assertEquals(listOf(ElementDiff.Updated(before = original, after = replacement)), diffs)
+        sheet.undo()
+        assertEquals(original, sheet.snapshot.value.elements[original.id])
+    }
+
+    @Test
+    fun `updating an element back to how it was in one transaction cancels out`() {
+        val original = TestElements.stroke(z = FractionalIndex("a0"))
+        val sheet = newSheet(initial = listOf(original))
+
+        val result = sheet.transact("there and back") {
+            update(original.id) { (it as StrokeElement).copy(anchor = WorldPoint(5.0, 5.0)) }
+            update(original.id) { original }
+        }
+
+        assertEquals(TransactionResult.NoChange, result)
+        assertSame(original, sheet.snapshot.value.elements[original.id])
+    }
+
+    @Test
+    fun `adding then updating in one transaction is one add of the final element`() {
+        val sheet = newSheet()
+        val element = TestElements.stroke(z = FractionalIndex("a0"))
+        val moved = element.copy(anchor = WorldPoint(3.0, 4.0))
+
+        val diffs = committed(sheet.transact("add and move") {
+            add(element)
+            update(element.id) { moved }
+        }).diffs
+
+        assertEquals(listOf(ElementDiff.Added(moved)), diffs)
+        sheet.undo()
+        assertTrue(sheet.snapshot.value.elements.isEmpty())
+        sheet.redo()
+        assertEquals(moved, sheet.snapshot.value.elements[element.id])
+    }
+
+    @Test
+    fun `updating then deleting in one transaction deletes the original, and undo brings the original back`() {
+        val original = TestElements.stroke(z = FractionalIndex("a0"))
+        val sheet = newSheet(initial = listOf(original))
+
+        val diffs = committed(sheet.transact("move and delete") {
+            update(original.id) { (it as StrokeElement).copy(anchor = WorldPoint(7.0, 7.0)) }
+            delete(original.id)
+        }).diffs
+
+        assertEquals(listOf(ElementDiff.Deleted(original)), diffs)
+        sheet.undo()
+        assertEquals(original, sheet.snapshot.value.elements[original.id])
+    }
+
+    @Test
     fun `undo and redo with nothing to do are no-ops`() {
         val sheet = newSheet()
 

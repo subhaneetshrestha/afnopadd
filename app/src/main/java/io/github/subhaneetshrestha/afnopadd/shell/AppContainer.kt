@@ -2,6 +2,8 @@ package io.github.subhaneetshrestha.afnopadd.shell
 
 import android.content.Context
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.preferencesDataStore
 import io.github.subhaneetshrestha.afnopadd.tools.color.RecentColorsStore
 import io.github.subhaneetshrestha.afnopadd.R
@@ -47,6 +49,9 @@ class AppContainer(val applicationContext: Context) {
 
     val recentColors: RecentColorsStore by lazy { RecentColorsStore(applicationContext.settingsDataStore) }
 
+    /** Open editor sessions, kept across activity recreation. */
+    val editorSessions: EditorSessions = EditorSessions()
+
     val library: SheetLibrary by lazy {
         RoomSheetLibrary(
             store = sheetStore,
@@ -61,8 +66,15 @@ class AppContainer(val applicationContext: Context) {
 
 private const val TAG = "AppContainer"
 
-/** The app's single preferences file (recent colours now; settings in Task 19). */
-private val Context.settingsDataStore by preferencesDataStore(name = "settings")
+/**
+ * The app's single preferences file (recent colours now; settings in Task 19). A corrupt file is
+ * replaced with empty preferences instead of failing every read: losing recents and toggles is
+ * recoverable, a settings file that crashes the editor on each open is not.
+ */
+private val Context.settingsDataStore by preferencesDataStore(
+    name = "settings",
+    corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
+)
 
 val LocalAppContainer = staticCompositionLocalOf<AppContainer> {
     error("No AppContainer provided; wrap the content in CompositionLocalProvider(LocalAppContainer provides ...)")

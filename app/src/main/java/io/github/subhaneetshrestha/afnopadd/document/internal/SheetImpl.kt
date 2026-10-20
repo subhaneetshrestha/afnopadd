@@ -51,7 +51,11 @@ internal class SheetImpl(
     override val canUndo: StateFlow<Boolean> = _canUndo.asStateFlow()
     override val canRedo: StateFlow<Boolean> = _canRedo.asStateFlow()
 
+    /** Set by the first [close]; afterwards every change is refused before anything is applied. */
+    private var closed = false
+
     override fun transact(label: String, block: Transaction.() -> Unit): TransactionResult = synchronized(lock) {
+        checkOpen()
         val working = WorkingTransaction(_snapshot.value, _meta.value.title)
         working.block()
         val diffs = working.diffs()
@@ -76,6 +80,7 @@ internal class SheetImpl(
     }
 
     override fun undo(): Unit = synchronized(lock) {
+        checkOpen()
         val original = undoStack.removeLastOrNull() ?: return
         val inverse = original.inverse(kind = TransactionKind.UNDO)
         apply(inverse)
@@ -84,6 +89,7 @@ internal class SheetImpl(
     }
 
     override fun redo(): Unit = synchronized(lock) {
+        checkOpen()
         val undone = redoStack.removeLastOrNull() ?: return
         val inverse = undone.inverse(kind = TransactionKind.REDO)
         apply(inverse)
@@ -94,7 +100,17 @@ internal class SheetImpl(
 
     override suspend fun flush() = onFlush()
 
-    override suspend fun close() = onClose(_snapshot.value)
+    /** Idempotent: the second and later calls return without touching the already released database. */
+    override suspend fun close() {
+        val snapshot = synchronized(lock) {
+            if (closed) return
+            closed = true
+            _snapshot.value
+        }
+        onClose(snapshot)
+    }
+
+    private fun checkOpen() = check(!closed) { "Sheet ${_meta.value.id.value} is closed" }
 
     private fun CommittedTransaction.inverse(kind: TransactionKind) = CommittedTransaction(
         id = TransactionId(ulid.next()),

@@ -46,6 +46,13 @@ interface SheetLibrary {
     /** Re-reads title, timestamps and element count from the sheet itself, e.g. after the editor closes it. */
     suspend fun refresh(id: SheetId)
 
+    /**
+     * Runs [close] (the editor flushing, closing and thumbnailing the sheet in its directory) under
+     * the library's lock, then refreshes the sheet's entry. A delete or duplicate issued meanwhile
+     * waits, so it never moves or copies a sheet that is still being written.
+     */
+    suspend fun closeEditing(id: SheetId, close: suspend (dir: File) -> Unit)
+
     /** Adds a sheet directory already placed under the library root (imports). */
     suspend fun register(dir: File): SheetSummary
 

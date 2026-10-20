@@ -119,6 +119,40 @@ class EraserToolTest {
     }
 
     @Test
+    fun `events from another pointer are ignored`() {
+        controller.onPointer(event(PointerPhase.DOWN, 0.0, 50.0))
+        // A second finger crossing the middle stroke must not erase it; only pointer 1 erases.
+        controller.onPointer(event(PointerPhase.MOVE, 40.0, 50.0).copy(pointerId = 2L))
+        controller.onPointer(event(PointerPhase.UP, 40.0, 50.0).copy(pointerId = 2L))
+        assertEquals(0, transactions)
+
+        controller.onPointer(event(PointerPhase.UP, 0.0, 50.0, time = 16L))
+        assertEquals(setOf(strokes[0].id), strokes.map { it.id }.toSet() - sheet.snapshot.value.elements.keys)
+    }
+
+    @Test
+    fun `switching tools mid-drag shows everything again and erases nothing`() {
+        controller.onPointer(event(PointerPhase.DOWN, -20.0, 50.0))
+        controller.onPointer(event(PointerPhase.MOVE, 60.0, 50.0, time = 8L))
+        assertEquals(2, controller.hiddenElements.value.size)
+
+        controller.onDeactivated()
+        controller.onPointer(event(PointerPhase.UP, 60.0, 50.0, time = 16L))
+
+        assertTrue(controller.hiddenElements.value.isEmpty())
+        assertEquals(0, transactions)
+        assertEquals(6, sheet.snapshot.value.elements.size)
+    }
+
+    @Test
+    fun `touching an already hidden stroke again erases it once`() {
+        drag(-20.0 to 50.0, 10.0 to 50.0, -20.0 to 60.0, 10.0 to 60.0)
+
+        assertEquals(1, transactions)
+        assertEquals(5, sheet.snapshot.value.elements.size)
+    }
+
+    @Test
     fun `a tap erases what is under it`() {
         drag(40.0 to 50.0, 40.0 to 50.0)
 
