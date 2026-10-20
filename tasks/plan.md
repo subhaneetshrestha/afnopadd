@@ -44,7 +44,7 @@ T1 build plumbing ─┬─ T2 app shell skeleton ──────────
 ### Checkpoint A: Document foundation (reached 2026-10-20)
 - [x] `.\gradlew.bat check` green; Room round trip of 5,000 strokes passes; crash test passes
 
-- [ ] Task 7: Camera model and canvas math
+- [x] Task 7: Camera model and canvas math (2026-10-20)
 - [ ] Task 8: SheetCanvas composable with pan, pinch, background
 - [ ] Task 9: Ink wet strokes (InProgressStrokes) with frame transform
 - [ ] Task 10: Dry stroke rendering with same-frame handoff

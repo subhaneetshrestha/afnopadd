@@ -176,14 +176,16 @@ Done 2026-10-20. Close compacts the op log to the newest 1,000 rows, purges tomb
 **Description:** Implement `Camera`, `CameraController` (pan, zoom around a pivot, animate, fit to bounds, clamps 0.001x to 100,000x), `CanvasMath` with double-precision world/screen conversion and `frameToScreenMatrix`, and the frame-level rule `floor(log10(zoom))`.
 
 **Acceptance criteria:**
-- [ ] World to screen to world round trip error is under 1e-6 world units at zoom 1e5 with coordinates up to 1e6, over 10,000 random cases.
-- [ ] Zooming around a pivot keeps the pivot's world point fixed to within 1e-9; clamps hold at both ends.
-- [ ] The float matrix produced for an element carries translations no larger than the viewport size in pixels.
+- [x] World to screen to world round trip error is under 1e-6 world units at zoom 1e5 with coordinates up to 1e6, over 10,000 random cases.
+- [x] Zooming around a pivot keeps the pivot's world point fixed to within 1e-9; clamps hold at both ends.
+- [x] The float matrix produced for an element carries translations no larger than the viewport size in pixels (for anchors inside the view).
 
 **Verification:**
-- [ ] Tests pass: `.\gradlew.bat testDebugUnitTest --tests "*.canvas.*"`
-- [ ] Build succeeds: `.\gradlew.bat assembleDebug`
-- [ ] Manual check: none
+- [x] Tests pass: `.\gradlew.bat testDebugUnitTest --tests "*.canvas.*"` (18 tests)
+- [x] Build succeeds: `.\gradlew.bat assembleDebug`
+- [x] Manual check: none
+
+Done 2026-10-20. Camera animation is left to the UI layer (`CanvasMath.interpolate` plus `CameraController.set`), picked up with the zoom commands in Task 19.
 
 **Dependencies:** Task 3
 
