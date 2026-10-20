@@ -66,8 +66,11 @@ fun EditorScreen(sheetId: String, modifier: Modifier = Modifier) {
         val open = sheet
         onDispose {
             open?.let {
+                val snapshot = it.snapshot.value
+                val updatedAt = it.meta.value.updatedAt
                 container.appScope.launch {
                     it.close()
+                    container.thumbnails.update(File(sheetsRoot(context), sheetId), snapshot, updatedAt)
                     container.library.refresh(SheetId(sheetId))
                 }
             }

@@ -95,7 +95,7 @@ internal class RoomSheetLibrary(
             createdAt = meta.createdAt,
             updatedAt = meta.updatedAt,
             lastOpenedAt = null,
-            thumbPath = null,
+            thumbPath = thumbPathFor(target.name),
             elementCount = elementCount,
         )
         dao.upsert(entity)
@@ -130,7 +130,7 @@ internal class RoomSheetLibrary(
     override suspend fun refresh(id: SheetId) = mutex.withLock {
         val row = dao.get(id.value) ?: return@withLock
         val info = store.inspect(File(root, row.dirName))
-        dao.upsert(row.copy(title = info.meta.title, updatedAt = info.meta.updatedAt, elementCount = info.elementCount))
+        dao.upsert(row.copy(title = info.meta.title, updatedAt = info.meta.updatedAt, elementCount = info.elementCount, thumbPath = thumbPathFor(row.dirName)))
     }
 
     override suspend fun register(dir: File): SheetSummary = mutex.withLock { registerLocked(dir) }
@@ -164,7 +164,7 @@ internal class RoomSheetLibrary(
             createdAt = info.meta.createdAt,
             updatedAt = info.meta.updatedAt,
             lastOpenedAt = existing?.lastOpenedAt,
-            thumbPath = existing?.thumbPath,
+            thumbPath = thumbPathFor(dir.name),
             elementCount = info.elementCount,
         )
         dao.upsert(entity)
@@ -181,6 +181,10 @@ internal class RoomSheetLibrary(
             }
         }
     }
+
+    /** Relative path of the sheet's thumbnail if one has been written. */
+    private fun thumbPathFor(dirName: String): String? =
+        "$dirName/${SheetLibrary.THUMBNAIL_FILE_NAME}".takeIf { File(root, it).isFile }
 
     private suspend fun requireRow(id: SheetId): SheetEntity =
         dao.get(id.value) ?: throw IllegalArgumentException("No sheet ${id.value} in the library")

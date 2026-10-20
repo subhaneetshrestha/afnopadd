@@ -51,4 +51,9 @@ interface SheetLibrary {
 
     /** Makes the index match the directories on disk and purges trash older than seven days. */
     suspend fun reconcile()
+
+    companion object {
+        /** Written into the sheet directory by whoever renders it; [refresh] picks it up. */
+        const val THUMBNAIL_FILE_NAME = "thumb.webp"
+    }
 }

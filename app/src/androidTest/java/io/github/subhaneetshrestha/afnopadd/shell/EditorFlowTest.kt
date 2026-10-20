@@ -71,6 +71,20 @@ class EditorFlowTest {
     }
 
     @Test
+    fun leavingTheEditorWritesAThumbnailTheMenuCanShow() {
+        val sheet = createSheetAndDraw()
+        leaveEditor()
+
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            runBlocking { container.library.sheets.first() }.first { it.id == sheet.id }.thumbnail?.isFile == true
+        }
+        val thumbnail = runBlocking { container.library.sheets.first() }.first { it.id == sheet.id }.thumbnail!!
+        val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        android.graphics.BitmapFactory.decodeFile(thumbnail.absolutePath, bounds)
+        assertEquals(512, maxOf(bounds.outWidth, bounds.outHeight))
+    }
+
+    @Test
     fun undoRemovesTheStrokeBeforeLeaving() {
         val sheet = createSheetAndDraw()
         composeRule.onNodeWithContentDescription(context.getString(R.string.command_undo)).performClick()

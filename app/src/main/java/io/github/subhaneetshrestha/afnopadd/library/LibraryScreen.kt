@@ -41,7 +41,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import coil3.compose.AsyncImage
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -242,10 +244,19 @@ private fun SheetCard(
     }
 }
 
-/** Placeholder surface until thumbnails are rendered (Task 14). */
+/** The sheet's rendered preview on a neutral surface; Coil keys files by path and modification time. */
 @Composable
 private fun Thumbnail(file: File?, modifier: Modifier) {
-    Box(modifier.background(MaterialTheme.colorScheme.surfaceVariant))
+    Box(modifier.background(MaterialTheme.colorScheme.surfaceVariant)) {
+        if (file != null) {
+            AsyncImage(
+                model = file,
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.White),
+            )
+        }
+    }
 }
 
 @Composable

@@ -3,6 +3,8 @@ package io.github.subhaneetshrestha.afnopadd.shell
 import android.content.Context
 import androidx.compose.runtime.staticCompositionLocalOf
 import io.github.subhaneetshrestha.afnopadd.R
+import io.github.subhaneetshrestha.afnopadd.canvas.Renderer
+import io.github.subhaneetshrestha.afnopadd.canvas.SoftwareRenderer
 import io.github.subhaneetshrestha.afnopadd.document.SheetStore
 import io.github.subhaneetshrestha.afnopadd.document.internal.RoomSheetStore
 import io.github.subhaneetshrestha.afnopadd.library.SheetLibrary
@@ -23,6 +25,10 @@ class AppContainer(val applicationContext: Context) {
     val appScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     val sheetStore: SheetStore by lazy { RoomSheetStore(applicationContext) }
+
+    val renderer: Renderer by lazy { SoftwareRenderer() }
+
+    val thumbnails: ThumbnailWriter by lazy { ThumbnailWriter(renderer) }
 
     val library: SheetLibrary by lazy {
         RoomSheetLibrary(

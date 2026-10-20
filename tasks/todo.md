@@ -392,14 +392,16 @@ Done 2026-10-20. The editor now opens sheets by id from `files/sheets/`, marks t
 **Description:** Implement `Renderer.renderBitmap` (software canvas, internal tiling above 100 megapixels) and `Renderer.renderTo` in `canvas-engine`, then generate a 512 px WebP thumbnail when the editor closes a sheet whose `updatedAt` is newer than its thumbnail, and show thumbnails in the library through Coil.
 
 **Acceptance criteria:**
-- [ ] `renderBitmap` of a region matches the on-screen rendering of the same region with under 1 percent pixel difference.
-- [ ] A 100-megapixel request succeeds through tiling without a hardware-canvas size exception.
-- [ ] Closing an edited sheet writes `thumb.webp`; the library shows it within one refresh.
+- [x] `renderBitmap` of a region matches the on-screen rendering of the same region with under 1 percent pixel difference (0.003 percent measured).
+- [x] A 100-megapixel request succeeds through tiling (`renderTiled`, 25 tiles of 2,048 px) without a hardware-canvas size exception; single bitmaps above 100 megapixels are refused with a message pointing to tiling.
+- [x] Closing an edited sheet writes `thumb.webp` (longest edge 512 px); the library shows it within one refresh.
 
 **Verification:**
-- [ ] Tests pass: `connectedDebugAndroidTest` for the renderer comparison and thumbnail creation
-- [ ] Build succeeds: `.\gradlew.bat assembleDebug`
-- [ ] Manual check: thumbnails visible in the library
+- [x] Tests pass: `RenderGeometryTest` (JVM), `SoftwareRendererTest` and the thumbnail case in `EditorFlowTest`; full suite of 51 instrumented tests green on `afnopadd36`
+- [x] Build succeeds: `.\gradlew.bat assembleDebug`
+- [ ] Manual check: thumbnails visible in the library (owner)
+
+Done 2026-10-20. Thumbnails are only re-rendered when the sheet changed since the last one; an empty sheet has none.
 
 **Dependencies:** Task 13, Task 10
 

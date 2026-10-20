@@ -2,6 +2,7 @@ package io.github.subhaneetshrestha.afnopadd.canvas
 
 import io.github.subhaneetshrestha.afnopadd.document.LocalPoint
 import io.github.subhaneetshrestha.afnopadd.document.WorldPoint
+import io.github.subhaneetshrestha.afnopadd.document.WorldRect
 import kotlin.math.pow
 
 /**
@@ -27,6 +28,14 @@ object CanvasMath {
             scale = camera.zoom * FrameLevels.worldUnitsPerLocalUnit(frameLevel),
             translateX = (anchor.x - camera.center.x) * camera.zoom + viewport.centerX,
             translateY = (anchor.y - camera.center.y) * camera.zoom + viewport.centerY,
+        )
+
+    /** The map from frame-local units to pixels of an off-screen region whose top-left is [region]'s top-left. */
+    fun frameToRegion(region: WorldRect, scalePxPerUnit: Double, anchor: WorldPoint, frameLevel: Int): FrameTransform =
+        FrameTransform(
+            scale = scalePxPerUnit * FrameLevels.worldUnitsPerLocalUnit(frameLevel),
+            translateX = (anchor.x - region.left) * scalePxPerUnit,
+            translateY = (anchor.y - region.top) * scalePxPerUnit,
         )
 
     /** Linear in the centre, geometric in the zoom, so an animated zoom feels uniform. */
