@@ -107,7 +107,8 @@ internal class SheetImpl(
     )
 
     private fun apply(transaction: CommittedTransaction) {
-        val elements = _snapshot.value.elements.toMutableMap()
+        val current = _snapshot.value
+        val elements = current.elements.toMutableMap()
         for (diff in transaction.diffs) {
             when (diff) {
                 is ElementDiff.Added -> elements[diff.id] = diff.after
@@ -115,7 +116,7 @@ internal class SheetImpl(
                 is ElementDiff.Deleted -> elements.remove(diff.id)
             }
         }
-        _snapshot.value = ElementSnapshot(elements)
+        _snapshot.value = current.next(elements, transaction.diffs.mapTo(HashSet()) { it.id })
         _meta.value = _meta.value.copy(
             title = transaction.titleChange?.after ?: _meta.value.title,
             updatedAt = transaction.committedAt,

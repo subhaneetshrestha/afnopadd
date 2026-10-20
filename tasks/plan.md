@@ -61,7 +61,7 @@ T1 build plumbing ─┬─ T2 app shell skeleton ──────────
 - [x] Task 15: Stroke tool family, presets, thickness (2026-10-20)
 - [x] Task 16: Colour palette, picker, recents (2026-10-20)
 - [ ] Task 16b: Investigate the render-thread crash when leaving the editor (added 2026-10-20; before Checkpoint C)
-- [ ] Task 17: Spatial index, hit-testing, eraser
+- [x] Task 17: Spatial index, hit-testing, eraser (2026-10-20; device fps check pending)
 - [ ] Task 18: Shape tools and rendering
 - [ ] Task 19: Hand tool, zoom commands, finger-mode policy, settings store
 

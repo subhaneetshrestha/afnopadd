@@ -24,7 +24,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.subhaneetshrestha.afnopadd.R
 import io.github.subhaneetshrestha.afnopadd.canvas.CameraController
+import io.github.subhaneetshrestha.afnopadd.canvas.ElementIndex
 import io.github.subhaneetshrestha.afnopadd.canvas.SheetCanvas
+import io.github.subhaneetshrestha.afnopadd.canvas.SheetHitTester
+import io.github.subhaneetshrestha.afnopadd.canvas.StrokeHitTest
 import android.util.Log
 import io.github.subhaneetshrestha.afnopadd.document.Sheet
 import io.github.subhaneetshrestha.afnopadd.document.SheetFormatException
@@ -39,6 +42,7 @@ import io.github.subhaneetshrestha.afnopadd.tools.ToolbarSpec
 import io.github.subhaneetshrestha.afnopadd.tools.ToolbarSpecJson
 import io.github.subhaneetshrestha.afnopadd.tools.ToolbarState
 import io.github.subhaneetshrestha.afnopadd.tools.color.ColorPickerDialog
+import io.github.subhaneetshrestha.afnopadd.tools.eraser.EraserTool
 import io.github.subhaneetshrestha.afnopadd.tools.options.StrokeOptionsBar
 import io.github.subhaneetshrestha.afnopadd.tools.presets.BuiltInPresets
 import io.github.subhaneetshrestha.afnopadd.tools.presets.BuiltInTools
@@ -104,12 +108,22 @@ private fun EditorContent(sheet: Sheet, modifier: Modifier) {
     val context = LocalContext.current
     val styles = LocalAppContainer.current.toolStyles
     val camera = remember(sheet) { CameraController() }
-    val toolContext = remember(sheet) { ToolContext(sheet, camera, styles) }
-    val registry = remember { ToolRegistry().apply { BuiltInPresets.strokeTools.forEach { register(StrokeTool(it)) } } }
+    // One index serves both the canvas's culling and the tools' hit-testing.
+    val index = remember(sheet) { ElementIndex() }
+    val toolContext = remember(sheet) {
+        ToolContext(sheet, camera, styles, hitTester = SheetHitTester(sheet, index, StrokeHitTest.ink()))
+    }
+    val registry = remember {
+        ToolRegistry().apply {
+            BuiltInPresets.strokeTools.forEach { register(StrokeTool(it)) }
+            register(EraserTool())
+        }
+    }
     val toolbarState = remember { ToolbarState(initialToolId = BuiltInTools.PEN) }
     val activeToolId by toolbarState.activeToolId.collectAsState()
     val activeTool = registry.get(activeToolId) ?: registry.get(BuiltInTools.PEN)!!
     val controller = remember(activeTool, toolContext) { activeTool.createController(toolContext) }
+    val hiddenElements by controller.hiddenElements.collectAsState()
     val styleMap by styles.styles.collectAsState()
     val container = LocalAppContainer.current
     val recentColors by container.recentColors.colors.collectAsState(initial = emptyList())
@@ -164,6 +178,8 @@ private fun EditorContent(sheet: Sheet, modifier: Modifier) {
             inputSink = controller,
             modifier = Modifier.fillMaxSize().padding(innerPadding).testTag(ShellTags.EDITOR_CANVAS),
             wetStrokeBrush = controller::wetStrokeBrush,
+            index = index,
+            hiddenElements = hiddenElements,
         )
     }
 }

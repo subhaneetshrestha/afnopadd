@@ -21,7 +21,7 @@ interface Tool {
     val capabilities: Set<ToolCapability> // STROKE, SHAPE, SELECT, ERASE, NAVIGATE
     fun createController(context: ToolContext): ToolController
 }
-interface ToolController : CanvasInputSink { fun onActivated(); fun onDeactivated(); val options: StateFlow<ToolOptions> }
+interface ToolController : CanvasInputSink { fun onActivated(); fun onDeactivated(); val options: StateFlow<ToolOptions>; val hiddenElements: StateFlow<Set<ElementId>> } // hidden = in-gesture preview (eraser)
 class ToolContext(val sheet: Sheet, val camera: CameraController, val hitTester: HitTester, val style: StateFlow<CurrentStyle>)
 interface ToolRegistry { fun register(tool: Tool); fun get(id: String): Tool?; val all: List<Tool> }
 data class ToolPreset(val id: String, val baseToolId: String, val label: String, val params: Map<String, ParamValue>)

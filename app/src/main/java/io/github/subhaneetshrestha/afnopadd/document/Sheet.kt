@@ -13,11 +13,29 @@ data class SheetMeta(
     val schemaVersion: Int = SHEET_SCHEMA_VERSION,
 )
 
-/** Immutable view of every live element, keyed by id, with a z-ordered list derived on demand. */
-class ElementSnapshot(val elements: Map<ElementId, Element>) {
+/**
+ * Immutable view of every live element, keyed by id, with a z-ordered list derived on demand.
+ * A snapshot produced by a transaction also records which ids it changed, so observers such as the
+ * spatial index can follow a sheet without comparing every element (see [changedSince]).
+ */
+class ElementSnapshot private constructor(
+    val elements: Map<ElementId, Element>,
+    private val lineage: Any,
+    private val version: Long,
+    private val changed: Set<ElementId>,
+) {
+    constructor(elements: Map<ElementId, Element>) : this(elements, Any(), 0L, emptySet())
 
     /** Elements from back to front. */
     val ordered: List<Element> by lazy { elements.values.sortedBy { it.z } }
+
+    /** The ids added, updated or deleted since [previous] if this snapshot was made from it in one step, else null. */
+    fun changedSince(previous: ElementSnapshot): Set<ElementId>? =
+        if (previous.lineage === lineage && previous.version + 1 == version) changed else null
+
+    /** The snapshot one step after this one, holding [elements], in which exactly [changed] differ. */
+    fun next(elements: Map<ElementId, Element>, changed: Set<ElementId>): ElementSnapshot =
+        ElementSnapshot(elements, lineage, version + 1, changed)
 
     companion object {
         val EMPTY = ElementSnapshot(emptyMap())

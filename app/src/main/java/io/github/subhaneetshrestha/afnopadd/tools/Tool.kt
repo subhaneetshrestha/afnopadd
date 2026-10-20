@@ -4,10 +4,15 @@ import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import io.github.subhaneetshrestha.afnopadd.canvas.CameraController
 import io.github.subhaneetshrestha.afnopadd.canvas.CanvasInputSink
+import io.github.subhaneetshrestha.afnopadd.canvas.HitTester
+import io.github.subhaneetshrestha.afnopadd.canvas.SheetHitTester
 import io.github.subhaneetshrestha.afnopadd.canvas.StrokeFrame
 import io.github.subhaneetshrestha.afnopadd.document.BrushSpec
+import io.github.subhaneetshrestha.afnopadd.document.ElementId
 import io.github.subhaneetshrestha.afnopadd.document.Sheet
 import io.github.subhaneetshrestha.afnopadd.document.Ulid
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlin.random.Random
 
 enum class ToolCapability { STROKE, SHAPE, SELECT, ERASE, NAVIGATE }
@@ -38,13 +43,19 @@ interface ToolController : CanvasInputSink {
 
     /** The brush for a wet stroke started in [frame], or null if this tool does not ink. */
     fun wetStrokeBrush(frame: StrokeFrame): BrushSpec? = null
+
+    /** Elements the canvas should leave out while a gesture is in progress (the eraser's preview). */
+    val hiddenElements: StateFlow<Set<ElementId>> get() = NOTHING_HIDDEN
 }
+
+private val NOTHING_HIDDEN: StateFlow<Set<ElementId>> = MutableStateFlow(emptySet())
 
 /** Everything a tool controller needs; clock and randomness are injectable for deterministic tests. */
 class ToolContext(
     val sheet: Sheet,
     val camera: CameraController,
     val styles: ToolStyles,
+    val hitTester: HitTester = SheetHitTester(sheet),
     val clock: () -> Long = System::currentTimeMillis,
     val random: Random = Random.Default,
     val ulid: Ulid = Ulid.Default,

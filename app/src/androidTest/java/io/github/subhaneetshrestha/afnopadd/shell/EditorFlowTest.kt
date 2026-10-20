@@ -137,6 +137,33 @@ class EditorFlowTest {
     }
 
     @Test
+    fun theEraserRemovesATouchedStrokeAndUndoBringsItBack() {
+        val sheet = createSheetAndDraw()
+        composeRule.onNodeWithTag(io.github.subhaneetshrestha.afnopadd.tools.ToolbarTags.item("tool:eraser")).performClick()
+        // Miss first: a swipe well away from the stroke erases nothing.
+        composeRule.onNodeWithTag(ShellTags.EDITOR_CANVAS).performTouchInput {
+            down(Offset(600f, 150f))
+            moveTo(Offset(650f, 200f))
+            up()
+        }
+        composeRule.waitForIdle()
+        assertEquals(1, strokeCount(sheet))
+
+        // The stroke runs from (200, 400) to (400, 500); cross it at x = 300.
+        composeRule.onNodeWithTag(ShellTags.EDITOR_CANVAS).performTouchInput {
+            down(Offset(300f, 350f))
+            moveTo(Offset(300f, 450f))
+            moveTo(Offset(300f, 550f))
+            up()
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { strokeCount(sheet) == 0 }
+
+        composeRule.onNodeWithContentDescription(context.getString(R.string.command_undo)).performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { strokeCount(sheet) == 1 }
+        leaveEditor()
+    }
+
+    @Test
     fun undoRemovesTheStrokeBeforeLeaving() {
         val sheet = createSheetAndDraw()
         composeRule.onNodeWithContentDescription(context.getString(R.string.command_undo)).performClick()

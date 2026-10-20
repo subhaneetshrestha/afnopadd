@@ -28,7 +28,13 @@ interface CanvasInputSink {                                    // implemented by
     fun onWetStrokeFinished(stroke: FinishedStroke)            // Ink stroke + inputs, already in frame units
 }
 interface SpatialIndex { fun query(rect: WorldRect): List<ElementId>; fun nearest(point: WorldPoint, maxDistance: Double): ElementId? }
-interface HitTester { fun elementAt(point: WorldPoint, tolerancePx: Float, camera: Camera): ElementId?; fun elementsIn(rect: WorldRect): List<ElementId> }
+class ElementIndex : SpatialIndex { fun sync(snapshot: ElementSnapshot); fun visible(snapshot, rect): List<Element> }   // shared by canvas and tools
+interface HitTester {
+    fun elementAt(point: WorldPoint, tolerancePx: Float, camera: Camera): ElementId?           // top-most
+    fun elementsIn(rect: WorldRect): List<ElementId>                                           // bounds fully inside, back to front
+    fun elementsAlong(from: WorldPoint, to: WorldPoint, radius: Double): List<ElementId>       // eraser path, front to back
+}
+fun interface StrokeHitTest { fun touches(stroke, from: LocalPoint, to: LocalPoint, radius: Float): Boolean }   // Centerline (JVM) or ink() (mesh)
 interface Renderer {
     fun renderBitmap(snapshot: ElementSnapshot, bounds: WorldRect, scalePxPerUnit: Double, background: Background): Bitmap   // software canvas, tiled internally above 100 MP
     fun renderTo(canvas: android.graphics.Canvas, snapshot: ElementSnapshot, bounds: WorldRect, scalePxPerUnit: Double)     // used for PDF pages
@@ -42,7 +48,7 @@ interface Renderer {
 3. **Wet strokes through Ink.** `InProgressStrokes` runs in the current frame level `floor(log10(zoom))`; its `pointerEventToWorldTransform` is the inverse of the frame-to-screen matrix, so Ink sees frame units and brush sizes stay in its recommended range. Motion prediction from `input-motionprediction` is enabled. On finish, the engine hands the stroke to the active tool through `onWetStrokeFinished` and draws it as a dry stroke in the same frame to avoid the wet-to-dry flicker Ink's documentation warns about.
 4. **Dry strokes.** Ink `Stroke` objects are built lazily from `StrokeElement.points` and cached per element (LRU by memory). Rendering uses `CanvasStrokeRenderer.draw` with the exact per-element matrix. When the relative zoom between the camera and the stroke's frame level exceeds 100x, the engine re-tessellates the stroke with a 100x finer `epsilon` and caches that variant per bucket, so zooming into an old coarse stroke never shows facets.
 5. **Tile pyramid for zoomed-out views.** 256 px tiles keyed by `(bucket, tileX, tileY)` rendered on a background thread into hardware bitmaps, LRU budget 96 MB, invalidated by dirty rectangles after each transaction. Tiles are used only when the bucket is below the vector threshold (strokes thinner than 0.5 px or more than 2,000 visible elements); otherwise the engine draws vectors directly. This is on the critical path for devices below API 34, where Ink renders dry strokes with `drawPath`.
-6. **Spatial index** is an in-memory R-tree over world-space bounds rebuilt from the snapshot on open and updated incrementally by observing transactions.
+6. **Spatial index** is an in-memory R-tree over world-space bounds, bulk-loaded (sort-tile-recursive) from the first snapshot and updated incrementally after that: each `ElementSnapshot` made by a transaction names the ids it changed (`changedSince`), so a commit touches only those entries; any other snapshot is diffed by reference. Stroke hit-testing intersects the eraser path with the Ink mesh using two triangles, because Ink 1.0.0's `ImmutableParallelogram.fromSegmentAndPadding` reports coverage far from where the parallelogram lies (Task 17).
 7. **Images** render from Coil 3 bitmaps requested at the power-of-two size that matches the bucket (Coil's size-keyed cache is the mip pyramid), drawn with bilinear filtering through the element's matrix, honouring crop and rotation. Pixelation at deep zoom is expected and documented.
 8. **Shapes** are drawn as `Path` with stroke width in frame units scaled through the matrix, anti-aliased, with arrowheads scaled to line width.
 9. **Gesture policy** is injected: the engine reports every pointer with its tool type; `drawing-tools` decides whether a single finger draws or pans, and its hand tool pans with any single pointer. Two-pointer gestures (pinch zoom around the focal point, two-finger pan) always belong to the camera in every tool. Pointer cancellation (`ACTION_CANCEL`, `FLAG_CANCELED`) cancels the wet stroke. Two-finger rotate is not in v1.

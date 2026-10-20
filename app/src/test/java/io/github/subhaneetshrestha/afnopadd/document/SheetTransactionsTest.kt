@@ -37,6 +37,26 @@ class SheetTransactionsTest {
     )
 
     @Test
+    fun `each new snapshot names the ids it changed relative to the one before`() {
+        val existing = TestElements.stroke(z = FractionalIndex("a0"))
+        val sheet = newSheet(initial = listOf(existing))
+        val first = sheet.snapshot.value
+        val added = TestElements.stroke(z = FractionalIndex("a1"))
+
+        sheet.transact("add") { add(added) }
+        val second = sheet.snapshot.value
+        sheet.undo()
+        val third = sheet.snapshot.value
+
+        assertEquals(setOf(added.id), second.changedSince(first))
+        assertEquals(setOf(added.id), third.changedSince(second))
+        // Not a direct successor: callers must fall back to a full comparison.
+        assertNull(third.changedSince(first))
+        assertNull(second.changedSince(second))
+        assertNull(second.changedSince(ElementSnapshot(first.elements)))
+    }
+
+    @Test
     fun `adding updating and deleting produce exactly those diffs`() {
         val existing = TestElements.stroke(z = FractionalIndex("a0"))
         val doomed = TestElements.shape(z = FractionalIndex("a1"))

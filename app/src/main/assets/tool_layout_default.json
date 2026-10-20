@@ -10,6 +10,7 @@
         { "ref": "tool:pencil" },
         { "ref": "tool:brush" },
         { "ref": "tool:highlighter" },
+        { "ref": "tool:eraser" },
         { "separator": true },
         { "ref": "cmd:undo" },
         { "ref": "cmd:redo" }

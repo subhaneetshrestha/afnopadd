@@ -454,6 +454,13 @@ Done 2026-10-20. The four tools are `ToolPreset`s of one `StrokeTool`, which is 
 - [x] Build succeeds: `.\gradlew.bat assembleDebug`
 - [ ] Manual check: pick colours, restart, confirm recents (owner)
 
+**Dependencies:** Task 15
+
+**Files likely touched:**
+- `tools/color/ColorPalette.kt`, `tools/color/ColorPicker.kt`, `tools/color/RecentColors.kt`, `tools/ToolbarHost.kt`
+
+**Estimated scope:** Medium
+
 Done 2026-10-20.
 
 ---
@@ -466,14 +473,9 @@ Done 2026-10-20.
 - [ ] Root cause identified (our teardown order, androidx.graphics/Ink, or emulator GPU emulation) and recorded in an ADR or this task.
 - [ ] If it is ours or avoidable, `EditorFlowTest` runs ten times in a row with no native crash.
 
+Evidence from Task 17 (2026-10-20): with three emulators on a 15 GB host the crash hit every `EditorFlowTest` run, mid-editor as well as on leaving (fault address `0x63e8` or `0x6348`, frames of 1 to 3 s); after the other emulators were shut down and `afnopadd36` cold-booted, three runs had no crash. The router listener leak fixed in the performance review (replaced `WetStrokeRouter`s stayed registered on the Ink view) may also have contributed.
+
 **Dependencies:** Task 16. **Priority:** before Checkpoint C.
-
-**Dependencies:** Task 15
-
-**Files likely touched:**
-- `tools/color/ColorPalette.kt`, `tools/color/ColorPicker.kt`, `tools/color/RecentColors.kt`, `tools/ToolbarHost.kt`
-
-**Estimated scope:** Medium
 
 ---
 
@@ -482,14 +484,16 @@ Done 2026-10-20.
 **Description:** Add an incremental R-tree over element bounds to `canvas-engine`, `HitTester` (point with tolerance, rectangle), switch the dry layer's visibility pass to the index, and implement the eraser tool that removes whole strokes (Ink geometry intersection) and shapes (geometry hit) touched during a gesture as one transaction. Images are not erasable.
 
 **Acceptance criteria:**
-- [ ] R-tree queries match brute force on 50,000 random rectangles, including after moves and deletes.
-- [ ] Dragging the eraser across three strokes and one image removes the three strokes in one undoable transaction and leaves the image.
-- [ ] Visibility pass through the index keeps a 5,000-stroke sheet panning at 60 fps on the API 34+ device (tiles for API 29 arrive in Task 24).
+- [x] R-tree queries match brute force on 50,000 random rectangles, including after moves and deletes (`RTreeTest`, incremental and bulk-loaded).
+- [x] Dragging the eraser across three strokes and one image removes the three strokes in one undoable transaction and leaves the image (`EraserToolTest`).
+- [ ] Visibility pass through the index keeps a 5,000-stroke sheet panning at 60 fps on the API 34+ device. Emulator, warm debug build: culling median 0.42 ms per frame, p95 1.0 ms, index build 56 ms (cold 158 ms), sync after one stroke 0.07 ms (`ElementIndexPerfTest`). Device fps pending the owner's tablet.
 
 **Verification:**
-- [ ] Tests pass: `.\gradlew.bat testDebugUnitTest --tests "*.canvas.*"` and `"*.tools.*"`
-- [ ] Build succeeds: `.\gradlew.bat assembleDebug`
+- [x] Tests pass: `.\gradlew.bat check` (129 unit tests); instrumented `InkStrokeHitTestTest` (4), `ElementIndexPerfTest` and `EditorFlowTest` (including the eraser flow, twice) green on `afnopadd36`. Earlier runs on an overloaded host were killed by the Task 16b crash.
+- [x] Build succeeds: `.\gradlew.bat assembleDebug`
 - [ ] Manual check: erase on a device
+
+Notes: Ink 1.0.0's `ImmutableParallelogram.fromSegmentAndPadding` gives wrong mesh coverage, so the mesh test uses two triangles. `ElementSnapshot.changedSince` lets the index follow a sheet per transaction instead of diffing all elements.
 
 **Dependencies:** Task 15
 

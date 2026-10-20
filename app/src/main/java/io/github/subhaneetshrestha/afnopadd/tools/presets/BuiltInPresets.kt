@@ -9,6 +9,7 @@ object BuiltInTools {
     const val PENCIL = "tool:pencil"
     const val BRUSH = "tool:brush"
     const val HIGHLIGHTER = "tool:highlighter"
+    const val ERASER = "tool:eraser"
 }
 
 /** Parameter keys understood by the stroke tool. */
