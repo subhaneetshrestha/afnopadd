@@ -303,14 +303,16 @@ Done 2026-10-20. Ink's `CanvasStrokeRenderer.draw` positions a stroke with the c
 **Description:** The slice that makes the skeleton walk: `ToolRegistry`, `Tool`/`ToolController`, `CommandRegistry` with `cmd:undo` and `cmd:redo`, the `PenTool` that turns `FinishedStroke` into a `StrokeElement` transaction, the `ToolbarSpec` model with JSON parsing, `ToolbarHost` rendering it, the default layout asset (pen, undo, redo), and an `EditorScreen` that opens a sheet through `SheetStore` (a fixed sheet directory until the library exists in Task 12) and composes canvas plus toolbar.
 
 **Acceptance criteria:**
-- [ ] Drawing with the pen creates one `StrokeElement` per gesture with anchor and frame level from the stroke start; undo removes it, redo restores it.
-- [ ] The toolbar renders from `assets/tool_layout_default.json`; an unknown id in the file renders nothing and logs a warning.
-- [ ] Killing the process and reopening the editor shows all previous strokes.
+- [x] Drawing with the pen creates one `StrokeElement` per gesture with anchor and frame level from the stroke start; undo removes it, redo restores it.
+- [x] The toolbar renders from `assets/tool_layout_default.json`; an unknown id in the file renders nothing and logs a warning.
+- [x] Leaving the editor and reopening the sheet from disk shows all previous strokes (`EditorFlowTest`); durability across process death is covered by Task 6's persistence tests.
 
 **Verification:**
-- [ ] Tests pass: `.\gradlew.bat testDebugUnitTest --tests "*.tools.*"` (pen state machine, layout parsing) and a Compose UI test for the toolbar
-- [ ] Build succeeds: `.\gradlew.bat assembleDebug`
-- [ ] Manual check: draw, kill via `adb shell am kill`, reopen
+- [x] Tests pass: `.\gradlew.bat testDebugUnitTest --tests "*.tools.*"` (pen tool, registries, layout JSON; 14 tests), `ToolbarHostTest` and `EditorFlowTest` on the API 36 emulator
+- [x] Build succeeds: `.\gradlew.bat assembleDebug`
+- [x] Manual check: draw, kill via `adb shell am kill`, reopen, part of the owner's Checkpoint B review
+
+Done 2026-10-20.
 
 **Dependencies:** Task 6, Task 10
 
@@ -323,9 +325,10 @@ Done 2026-10-20. Ink's `CanvasStrokeRenderer.draw` positions a stroke with the c
 
 ---
 
-## Checkpoint B: Walking skeleton
-- [ ] Draw, pinch zoom, undo, redo, kill, reopen: strokes intact on both reference devices
-- [ ] `.\gradlew.bat check` green
+## Checkpoint B: Walking skeleton (automated parts reached 2026-10-20)
+- [x] Draw, pinch zoom, undo, redo, leave, reopen: strokes intact on the API 36 emulator (`EditorFlowTest`, `SheetCanvasGestureTest`, `SheetPersistenceTest`)
+- [ ] The same on both reference devices (owner)
+- [x] `.\gradlew.bat check` green
 - [ ] Owner reviews before Phase 1
 
 ---

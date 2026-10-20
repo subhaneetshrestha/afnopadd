@@ -2,9 +2,14 @@
 <resources>
     <string name="app_name">Afnopadd</string>
 
-    <!-- Shell placeholders, replaced when the library and editor screens land -->
+    <!-- Shell placeholders, replaced when the library screen lands -->
     <string name="library_placeholder_title">Library</string>
     <string name="action_open_editor">Open editor</string>
-    <string name="editor_placeholder_title">Editor</string>
-    <string name="editor_placeholder_sheet">Sheet %1$s</string>
+    <string name="editor_loading">Opening sheet…</string>
+    <string name="sheet_default_title">Untitled sheet</string>
+
+    <!-- Tools and commands -->
+    <string name="tool_pen">Pen</string>
+    <string name="command_undo">Undo</string>
+    <string name="command_redo">Redo</string>
 </resources>

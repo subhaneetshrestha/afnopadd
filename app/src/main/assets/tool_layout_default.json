@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "source": "builtin",
+  "toolbars": [
+    {
+      "id": "main",
+      "placement": "bottom",
+      "items": [
+        { "ref": "tool:pen" },
+        { "separator": true },
+        { "ref": "cmd:undo" },
+        { "ref": "cmd:redo" }
+      ]
+    }
+  ]
+}

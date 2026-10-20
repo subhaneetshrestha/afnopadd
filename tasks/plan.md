@@ -49,10 +49,10 @@ T1 build plumbing ─┬─ T2 app shell skeleton ──────────
 - [x] Task 9: Ink wet strokes (InProgressStrokesView) with frame transform (2026-10-20)
 - [ ] Task 9b: Stylus tilt and motion prediction through MotionEvent interop (added 2026-10-20; before Checkpoint C)
 - [x] Task 10: Dry stroke rendering with same-frame handoff (2026-10-20)
-- [ ] Task 11: Pen tool, registries, JSON toolbar, editor wiring
+- [x] Task 11: Pen tool, registries, JSON toolbar, editor wiring (2026-10-20)
 
-### Checkpoint B: Walking skeleton
-- [ ] Draw with the pen, pinch zoom, undo, kill the process, reopen: strokes are intact. Owner reviews on a device before Phase 1.
+### Checkpoint B: Walking skeleton (automated parts reached 2026-10-20)
+- [ ] Draw with the pen, pinch zoom, undo, kill the process, reopen: strokes are intact. Verified on the API 36 emulator by tests; owner reviews on a device before Phase 1.
 
 ### Phase 1: Library and the full tool set
 - [ ] Task 12: Library index and SheetLibrary

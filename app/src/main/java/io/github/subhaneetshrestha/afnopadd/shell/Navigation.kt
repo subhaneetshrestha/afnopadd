@@ -1,7 +1,10 @@
 package io.github.subhaneetshrestha.afnopadd.shell
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
@@ -25,7 +28,9 @@ fun AfnopaddNavigation(modifier: Modifier = Modifier) {
                 )
             }
             entry<Destination.Editor> { key ->
-                EditorPlaceholder(sheetId = key.sheetId)
+                Box(Modifier.fillMaxSize().testTag(ShellTags.EDITOR_SCREEN)) {
+                    EditorScreen(sheetId = key.sheetId)
+                }
             }
         },
     )

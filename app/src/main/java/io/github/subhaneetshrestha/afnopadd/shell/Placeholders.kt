@@ -41,39 +41,10 @@ fun LibraryPlaceholder(onOpenEditor: () -> Unit, modifier: Modifier = Modifier) 
     }
 }
 
-/** Stand-in for the editor screen until the canvas and tools land (Task 11). */
-@Composable
-fun EditorPlaceholder(sheetId: String, modifier: Modifier = Modifier) {
-    Scaffold(modifier = modifier.fillMaxSize().testTag(ShellTags.EDITOR_SCREEN)) { innerPadding ->
-        Column(
-            modifier = Modifier.fillMaxSize().padding(innerPadding).padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text(
-                text = stringResource(R.string.editor_placeholder_title),
-                style = MaterialTheme.typography.headlineMedium,
-            )
-            Text(
-                text = stringResource(R.string.editor_placeholder_sheet, sheetId),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        }
-    }
-}
-
 @PreviewLightDark
 @Composable
 private fun LibraryPlaceholderPreview() {
     AfnopaddTheme {
         LibraryPlaceholder(onOpenEditor = {})
-    }
-}
-
-@PreviewLightDark
-@Composable
-private fun EditorPlaceholderPreview() {
-    AfnopaddTheme {
-        EditorPlaceholder(sheetId = "01JAX9Q8K0TZ3M4N5P6R7S8T9V")
     }
 }
