@@ -34,10 +34,18 @@ class EditorFlowTest {
 
     private fun strokeCount(sheet: SheetSummary): Int = runBlocking { container.sheetStore.inspect(sheet.dir).elementCount }
 
+    /** Waits for the editor to finish opening its sheet; on a cold start that takes longer than one idle pass. */
+    private fun awaitCanvas() {
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            composeRule.onAllNodesWithTag(ShellTags.EDITOR_CANVAS).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag(ShellTags.EDITOR_CANVAS).assertIsDisplayed()
+    }
+
     private fun createSheetAndDraw(): SheetSummary {
         val before = lastOpened()?.id
         composeRule.onNodeWithTag(LibraryTags.NEW_SHEET).performClick()
-        composeRule.onNodeWithTag(ShellTags.EDITOR_CANVAS).assertIsDisplayed()
+        awaitCanvas()
         composeRule.waitUntil(timeoutMillis = 5_000) { lastOpened()?.id.let { it != null && it != before } }
         val sheet = lastOpened()!!
         composeRule.onNodeWithTag(ShellTags.EDITOR_CANVAS).performTouchInput {
@@ -67,7 +75,7 @@ class EditorFlowTest {
             runBlocking { container.library.sheets.first() }.first { it.id == sheet.id }.elementCount == 1
         }
         composeRule.onNodeWithTag(LibraryTags.CONTINUE).performClick()
-        composeRule.onNodeWithTag(ShellTags.EDITOR_CANVAS).assertIsDisplayed()
+        awaitCanvas()
         assertEquals(sheet.id, lastOpened()?.id)
     }
 
@@ -88,7 +96,7 @@ class EditorFlowTest {
     @Test
     fun thePencilDrawsWithItsPreset() {
         composeRule.onNodeWithTag(LibraryTags.NEW_SHEET).performClick()
-        composeRule.onNodeWithTag(ShellTags.EDITOR_CANVAS).assertIsDisplayed()
+        awaitCanvas()
         composeRule.onNodeWithTag(io.github.subhaneetshrestha.afnopadd.tools.ToolbarTags.item("tool:pencil")).performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) { lastOpened() != null }
         val sheet = lastOpened()!!
@@ -114,7 +122,7 @@ class EditorFlowTest {
     fun aColourPickedFromThePaletteIsUsedForTheNextStroke() {
         val red = io.github.subhaneetshrestha.afnopadd.tools.color.ColorPalette.SWATCHES[4]
         composeRule.onNodeWithTag(LibraryTags.NEW_SHEET).performClick()
-        composeRule.onNodeWithTag(ShellTags.EDITOR_CANVAS).assertIsDisplayed()
+        awaitCanvas()
         composeRule.waitUntil(timeoutMillis = 5_000) { lastOpened() != null }
         val sheet = lastOpened()!!
         composeRule.onNodeWithTag(io.github.subhaneetshrestha.afnopadd.tools.options.StrokeOptionsTags.COLOR).performClick()

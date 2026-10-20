@@ -74,6 +74,21 @@ class SheetLibraryTest {
     }
 
     @Test
+    fun reconcileQuarantinesAnUnreadableSheetAndKeepsTheRest(): Unit = runBlocking {
+        val library = library()
+        val healthy = library.createSheet("Healthy")
+        // What a process killed mid-copy leaves behind: a directory whose database is cut short.
+        val broken = File(base, "sheets/01JAX9Q8K0TZ3M4N5P6R7S8T9V").apply { mkdirs() }
+        File(broken, "sheet.db").writeBytes(File(healthy.dir, "sheet.db").readBytes().copyOf(512))
+
+        library().reconcile()
+
+        assertEquals(listOf(healthy.id), library.sheets.first().map { it.id })
+        assertFalse("the broken directory is still in the library root", broken.exists())
+        assertTrue("the broken directory was not kept for recovery", File(base, "quarantine/${broken.name}/sheet.db").isFile)
+    }
+
+    @Test
     fun explicitTitlesAreValidated(): Unit = runBlocking {
         val library = library()
 

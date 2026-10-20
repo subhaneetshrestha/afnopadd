@@ -1,13 +1,13 @@
 package io.github.subhaneetshrestha.afnopadd.library.internal
 
 import android.util.Log
-import io.github.subhaneetshrestha.afnopadd.document.SheetFormatException
 import io.github.subhaneetshrestha.afnopadd.document.SheetId
 import io.github.subhaneetshrestha.afnopadd.document.SheetStore
 import io.github.subhaneetshrestha.afnopadd.document.Ulid
 import io.github.subhaneetshrestha.afnopadd.library.SheetLibrary
 import io.github.subhaneetshrestha.afnopadd.library.SheetSummary
 import io.github.subhaneetshrestha.afnopadd.library.SheetTitles
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -27,6 +27,8 @@ internal class RoomSheetLibrary(
     database: LibraryDatabase,
     private val root: File,
     private val trash: File,
+    /** Where unreadable sheet directories go so they stop breaking startup but are not lost. */
+    private val quarantine: File = File(trash.parentFile, "quarantine"),
     private val defaultTitlePrefix: String = "Sheet",
     private val copyTitle: (String) -> String = { "Copy of $it" },
     private val clock: () -> Long = System::currentTimeMillis,
@@ -138,19 +140,36 @@ internal class RoomSheetLibrary(
     override suspend fun reconcile(): Unit = mutex.withLock {
         val rows = dao.getAll()
         val dirs = withContext(Dispatchers.IO) {
-            root.listFiles { file -> file.isDirectory && File(file, SheetStore.DATABASE_FILE_NAME).isFile }.orEmpty().toList()
+            val all = root.listFiles { file -> file.isDirectory }.orEmpty().toList()
+            // A duplicate interrupted mid-copy leaves its staging directory behind; it was never a sheet.
+            all.filter { it.name.endsWith(SheetStore.STAGING_SUFFIX) }.forEach { it.deleteRecursively() }
+            all.filter { !it.name.endsWith(SheetStore.STAGING_SUFFIX) && File(it, SheetStore.DATABASE_FILE_NAME).isFile }
         }
         val present = dirs.map { it.name }.toSet()
         rows.filter { it.dirName !in present }.forEach { dao.delete(it.id) }
         val known = rows.map { it.dirName }.toSet()
         for (dir in dirs.filter { it.name !in known }) {
+            // Runs at every launch: one damaged directory must never stop the app from starting.
             try {
                 registerLocked(dir)
-            } catch (e: SheetFormatException) {
-                Log.w(TAG, "Skipping unreadable sheet directory ${dir.name}", e)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "Quarantining unreadable sheet directory ${dir.name}", e)
+                quarantineLocked(dir)
             }
         }
         purgeTrash()
+    }
+
+    /** Moves [dir] out of the library into `quarantine/`, kept for manual recovery rather than deleted. */
+    private suspend fun quarantineLocked(dir: File) = withContext(Dispatchers.IO) {
+        if (!quarantine.isDirectory && !quarantine.mkdirs()) {
+            Log.w(TAG, "Could not create $quarantine; leaving ${dir.name} in place")
+            return@withContext
+        }
+        val target = File(quarantine, dir.name).let { if (it.exists()) File(quarantine, "${dir.name}-${clock()}") else it }
+        if (!dir.renameTo(target)) Log.w(TAG, "Could not move ${dir.name} to quarantine")
     }
 
     private suspend fun registerLocked(dir: File): SheetSummary {

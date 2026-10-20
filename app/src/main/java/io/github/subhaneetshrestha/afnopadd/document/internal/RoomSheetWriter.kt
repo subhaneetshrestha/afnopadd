@@ -47,6 +47,13 @@ internal class RoomSheetWriter(
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
     private val lastError = AtomicReference<Throwable?>(null)
 
+    /**
+     * Strokes whose points a failed write did not store. A later change to such a stroke rewrites
+     * its points too, even if they did not change, so a move after a failed add cannot leave it
+     * empty. Only touched by the single consumer coroutine.
+     */
+    private val pointsMissing = HashSet<String>()
+
     init {
         scope.launch {
             for (command in queue) {
@@ -56,6 +63,10 @@ internal class RoomSheetWriter(
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {
+                        command.transaction.diffs.forEach { diff ->
+                            val after = (diff as? ElementDiff.Added)?.after ?: (diff as? ElementDiff.Updated)?.after
+                            if (after is StrokeElement) pointsMissing += diff.id.value
+                        }
                         lastError.compareAndSet(null, e)
                     }
                     is Command.Flush -> command.done.complete(Unit)
@@ -98,7 +109,7 @@ internal class RoomSheetWriter(
                 is ElementDiff.Updated -> {
                     elements += diff.after.toElementEntity(codec)
                     val after = diff.after
-                    if (after is StrokeElement && (diff.before !is StrokeElement || after.points != diff.before.points)) {
+                    if (after is StrokeElement && (diff.before !is StrokeElement || after.points != diff.before.points || diff.id.value in pointsMissing)) {
                         points += after.toStrokePointsEntity()
                     }
                     ops += transaction.op(OP_UPDATE, diff.id.value, before = diff.before, after = diff.after)
@@ -127,6 +138,10 @@ internal class RoomSheetWriter(
             transaction.titleChange?.let { add(MetaEntity(RoomSheetStore.META_TITLE, it.after)) }
         }
         database.sheetWriteDao().write(elements, points, ops, meta) { beforeCommit(transaction) }
+        if (pointsMissing.isNotEmpty()) {
+            points.forEach { pointsMissing -= it.elementId }
+            transaction.diffs.filterIsInstance<ElementDiff.Deleted>().forEach { pointsMissing -= it.id.value }
+        }
     }
 
     private fun CommittedTransaction.op(op: String, elementId: String, before: Element?, after: Element?) = OpEntity(

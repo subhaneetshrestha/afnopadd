@@ -26,9 +26,13 @@ import io.github.subhaneetshrestha.afnopadd.document.BrushSpec
  * Finished Ink strokes come back as [FinishedStroke]s. Ink keeps drawing its own copy until the
  * canvas has drawn the committed element once, then [drainHandoff] releases them, so the stroke
  * never blinks between the wet and dry layers.
+ *
+ * One router lives as long as its canvas; [downstream] is read when a gesture starts, and that
+ * gesture's events and its finished stroke go to that sink. Switching tools mid-stroke, or between
+ * lifting the pen and Ink finishing the stroke, therefore cannot lose the stroke.
  */
 internal class WetStrokeRouter(
-    private val downstream: CanvasInputSink,
+    private val downstream: () -> CanvasInputSink,
     private val cameraController: CameraController,
     private val viewport: () -> Viewport,
     private val wetStrokeBrush: (StrokeFrame) -> BrushSpec?,
@@ -36,6 +40,7 @@ internal class WetStrokeRouter(
 ) : CanvasInputSink, InProgressStrokesFinishedListener {
 
     private class ActiveStroke(
+        val sink: CanvasInputSink,
         val id: InProgressStrokeId,
         val frame: StrokeFrame,
         val brush: BrushSpec,
@@ -46,29 +51,39 @@ internal class WetStrokeRouter(
 
     var view: InProgressStrokesView? = null
         set(value) {
-            field?.removeFinishedStrokesListener(this)
+            if (value === field) return
+            field?.let { old ->
+                // A stroke still being drawn on the old view would otherwise stay on screen forever.
+                active?.let { old.cancelStroke(it.id) }
+                old.removeFinishedStrokesListener(this)
+            }
+            active = null
             field = value
             value?.addFinishedStrokesListener(this)
         }
 
     private var active: ActiveStroke? = null
+    /** The sink that received the current gesture's DOWN; it gets every event until UP or CANCEL. */
+    private var gestureSink: CanvasInputSink? = null
     private val awaitingFinish = HashMap<InProgressStrokeId, ActiveStroke>()
     private val pendingHandoff = LinkedHashSet<InProgressStrokeId>()
 
     override fun onPointer(event: CanvasPointerEvent) {
-        downstream.onPointer(event)
+        val sink = if (event.phase == PointerPhase.DOWN) downstream().also { gestureSink = it } else gestureSink ?: downstream()
+        sink.onPointer(event)
         when (event.phase) {
-            PointerPhase.DOWN -> begin(event)
+            PointerPhase.DOWN -> begin(sink, event)
             PointerPhase.MOVE -> active?.let { extend(it, event) }
             PointerPhase.UP -> active?.let { finish(it, event) }
             PointerPhase.CANCEL -> active?.let { cancel(it) }
         }
+        if (event.phase == PointerPhase.UP || event.phase == PointerPhase.CANCEL) gestureSink = null
     }
 
     override fun onStrokesFinished(strokes: Map<InProgressStrokeId, Stroke>) {
         for ((id, stroke) in strokes) {
             val record = awaitingFinish.remove(id) ?: continue
-            downstream.onWetStrokeFinished(
+            record.sink.onWetStrokeFinished(
                 FinishedStroke(
                     stroke = stroke,
                     frame = record.frame,
@@ -90,7 +105,7 @@ internal class WetStrokeRouter(
         return ids
     }
 
-    private fun begin(event: CanvasPointerEvent) {
+    private fun begin(sink: CanvasInputSink, event: CanvasPointerEvent) {
         val inkView = view ?: return
         val camera = cameraController.camera.value
         val level = FrameLevels.levelFor(camera.zoom)
@@ -101,6 +116,7 @@ internal class WetStrokeRouter(
         )
         val brush = wetStrokeBrush(frame) ?: return
         val record = ActiveStroke(
+            sink = sink,
             id = inkView.startStroke(
                 InkBridge.strokeInput(x = 0f, y = 0f, elapsedMillis = 0L, kind = event.kind, pressure = event.pressure),
                 InkBridge.toInkBrush(brush),
@@ -120,9 +136,9 @@ internal class WetStrokeRouter(
     }
 
     private fun finish(record: ActiveStroke, event: CanvasPointerEvent) {
+        active = null
         val inkView = view ?: return
         awaitingFinish[record.id] = record
-        active = null
         inkView.finishStroke(record.input(event), record.id)
     }
 

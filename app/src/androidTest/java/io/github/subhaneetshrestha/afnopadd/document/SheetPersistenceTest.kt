@@ -146,6 +146,27 @@ class SheetPersistenceTest {
     }
 
     @Test
+    fun aStrokeWhoseAddFailedIsWrittenInFullByItsNextChange() = runBlocking {
+        val dir = File(root, "repair")
+        val sheet = store(beforeCommit = { if (it.label == "add") error("injected disk failure") }).create(dir, title = "Repair")
+        val stroke = DeviceFixtures.stroke(z = FractionalIndex("a0"), pointCount = 12, seed = 4)
+        sheet.transact("add") { add(stroke) }
+        // A move changes the row but not the points; it must still carry the points the failed add lost.
+        sheet.transact("move") { update(stroke.id) { (it as StrokeElement).copy(anchor = WorldPoint(50.0, 60.0)) } }
+        runCatching { sheet.flush() }
+        sheet.close()
+
+        val reopened = store().open(dir)
+        try {
+            val restored = reopened.snapshot.value.elements.getValue(stroke.id) as StrokeElement
+            assertEquals(WorldPoint(50.0, 60.0), restored.anchor)
+            assertEquals(stroke.points, restored.points)
+        } finally {
+            reopened.close()
+        }
+    }
+
+    @Test
     fun aThousandPointStrokeCommitsQuickly() = runBlocking {
         val dir = File(root, "latency")
         val sheet = store().create(dir, title = "Latency")

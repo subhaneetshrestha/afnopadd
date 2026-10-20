@@ -20,11 +20,17 @@ import io.github.subhaneetshrestha.afnopadd.document.internal.db.openSheetDataba
 import io.github.subhaneetshrestha.afnopadd.document.internal.db.toElement
 import io.github.subhaneetshrestha.afnopadd.document.internal.json.ElementFormatException
 import io.github.subhaneetshrestha.afnopadd.document.internal.json.ElementJsonCodec
+import android.database.SQLException
+import androidx.sqlite.driver.bundled.BundledSQLiteDriver
+import androidx.sqlite.driver.bundled.SQLITE_OPEN_READONLY
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.IOException
 
 /** [SheetStore] backed by one Room database per sheet directory. */
 internal class RoomSheetStore(
@@ -60,9 +66,7 @@ internal class RoomSheetStore(
         }
     }
 
-    override suspend fun open(dir: File): Sheet {
-        val file = File(dir, SheetStore.DATABASE_FILE_NAME)
-        if (!file.isFile) throw SheetFormatException("No sheet database at $file")
+    override suspend fun open(dir: File): Sheet = readingSheet(File(dir, SheetStore.DATABASE_FILE_NAME)) { file ->
         val database = openSheetDatabase(context, file)
         try {
             val meta = readMeta(database)
@@ -85,47 +89,108 @@ internal class RoomSheetStore(
                     }
                 }.awaitAll().flatten()
             }
-            return newSheet(meta, elements, database, dir)
+            newSheet(meta, elements, database, dir)
         } catch (e: Throwable) {
             database.close()
             throw e
         }
     }
 
-    override suspend fun inspect(dir: File): SheetInfo {
-        val file = File(dir, SheetStore.DATABASE_FILE_NAME)
-        if (!file.isFile) throw SheetFormatException("No sheet database at $file")
+    override suspend fun inspect(dir: File): SheetInfo = readingSheet(File(dir, SheetStore.DATABASE_FILE_NAME)) { file ->
         val database = openSheetDatabase(context, file)
         try {
-            return SheetInfo(readMeta(database), database.elementDao().countLive().toInt())
+            SheetInfo(readMeta(database), database.elementDao().countLive().toInt())
         } finally {
             database.close()
         }
     }
 
     override suspend fun duplicate(source: File, target: File, id: SheetId, title: String): SheetMeta {
-        if (!File(source, SheetStore.DATABASE_FILE_NAME).isFile) throw SheetFormatException("No sheet database in $source")
         require(!target.exists()) { "Duplicate target $target already exists" }
+        verifySheetFile(File(source, SheetStore.DATABASE_FILE_NAME))
+        // Copy under a temporary name and rename into place only when complete, so a process killed
+        // mid-copy leaves a stray temporary directory, never a half-copied sheet in the library.
+        val staging = File(target.parentFile, "${target.name}${SheetStore.STAGING_SUFFIX}")
         try {
-            withContext(Dispatchers.IO) { source.copyRecursively(target) }
-            val database = openSheetDatabase(context, File(target, SheetStore.DATABASE_FILE_NAME))
-            try {
-                val now = clock().toString()
-                database.metaDao().upsertAll(
-                    listOf(
-                        MetaEntity(META_SHEET_ID, id.value),
-                        MetaEntity(META_TITLE, title),
-                        MetaEntity(META_CREATED_AT, now),
-                        MetaEntity(META_UPDATED_AT, now),
-                    ),
-                )
-                return readMeta(database)
-            } finally {
-                database.close()
+            withContext(Dispatchers.IO) {
+                staging.deleteRecursively()
+                source.copyRecursively(staging)
             }
+            val meta = readingSheet(File(staging, SheetStore.DATABASE_FILE_NAME)) { file ->
+                val database = openSheetDatabase(context, file)
+                try {
+                    val now = clock().toString()
+                    database.metaDao().upsertAll(
+                        listOf(
+                            MetaEntity(META_SHEET_ID, id.value),
+                            MetaEntity(META_TITLE, title),
+                            MetaEntity(META_CREATED_AT, now),
+                            MetaEntity(META_UPDATED_AT, now),
+                        ),
+                    )
+                    readMeta(database)
+                } finally {
+                    database.close()
+                }
+            }
+            withContext(Dispatchers.IO) {
+                if (!staging.renameTo(target)) throw IOException("Could not move the duplicate into place at $target")
+            }
+            return meta
         } catch (e: Throwable) {
-            target.deleteRecursively()
+            withContext(NonCancellable + Dispatchers.IO) {
+                staging.deleteRecursively()
+                target.deleteRecursively()
+            }
             throw e
+        }
+    }
+
+    /**
+     * Runs [block] on a sheet database that [verifySheetFile] accepted, turning any SQLite or Room
+     * failure into a [SheetFormatException]: a damaged or foreign file is an expected condition the
+     * library and editor handle, not a crash.
+     */
+    private suspend fun <T> readingSheet(file: File, block: suspend (File) -> T): T {
+        verifySheetFile(file)
+        return try {
+            block(file)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: SheetFormatException) {
+            throw e
+        } catch (e: SQLException) {
+            throw SheetFormatException("Sheet database $file is not readable: ${e.message}", e)
+        } catch (e: IllegalStateException) {
+            throw SheetFormatException("Sheet database $file could not be opened: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Rejects files that are not sheet databases before Room touches them: Room would add its
+     * tables to a foreign SQLite file and fail with an `IllegalStateException` on a newer version.
+     * Checks the SQLite header and that `user_version` is a version this app wrote and understands.
+     */
+    private suspend fun verifySheetFile(file: File) = withContext(Dispatchers.IO) {
+        if (!file.isFile) throw SheetFormatException("No sheet database at $file")
+        val header = ByteArray(SQLITE_HEADER.size)
+        val read = file.inputStream().use { it.read(header) }
+        if (read != header.size || !header.contentEquals(SQLITE_HEADER)) throw SheetFormatException("$file is not an SQLite database")
+        val userVersion = try {
+            val connection = BundledSQLiteDriver().open(file.absolutePath, SQLITE_OPEN_READONLY)
+            try {
+                connection.prepare("PRAGMA user_version").use { statement -> statement.step(); statement.getLong(0) }
+            } finally {
+                connection.close()
+            }
+        } catch (e: SQLException) {
+            throw SheetFormatException("$file is not a readable SQLite database: ${e.message}", e)
+        }
+        when {
+            userVersion == 0L -> throw SheetFormatException("$file is not a sheet database")
+            userVersion > SHEET_DATABASE_VERSION -> throw SheetFormatException(
+                "Sheet database version $userVersion is newer than this app supports ($SHEET_DATABASE_VERSION)",
+            )
         }
     }
 
@@ -188,6 +253,9 @@ internal class RoomSheetStore(
 
     internal companion object {
         const val ASSETS_DIRECTORY = "assets"
+        /** The Room `@Database(version = …)` of [SheetDatabase]; SQLite keeps it in `user_version`. */
+        const val SHEET_DATABASE_VERSION = 1L
+        private val SQLITE_HEADER = "SQLite format 3\u0000".toByteArray(Charsets.US_ASCII)
         const val OPS_TO_KEEP = 1_000
         const val DECODE_CHUNK_SIZE = 256
         const val META_SCHEMA_VERSION = "schema_version"

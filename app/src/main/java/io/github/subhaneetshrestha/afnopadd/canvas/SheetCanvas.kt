@@ -10,6 +10,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -54,11 +55,14 @@ fun SheetCanvas(
     var viewport by remember { mutableStateOf(Viewport(0, 0)) }
     var handoffTick by remember { mutableIntStateOf(0) }
     val dryLayer = remember { DryLayer() }
-    val router = remember(inputSink, cameraController, wetStrokeBrush) {
-        WetStrokeRouter(inputSink, cameraController, { viewport }, wetStrokeBrush, onHandoffPending = { handoffTick++ })
+    // One router for the canvas's lifetime; it reads the current tool when each gesture starts, so a
+    // tool switch never strands a stroke that the previous tool started.
+    val currentSink by rememberUpdatedState(inputSink)
+    val currentBrush by rememberUpdatedState(wetStrokeBrush)
+    val router = remember(cameraController) {
+        WetStrokeRouter({ currentSink }, cameraController, { viewport }, { frame -> currentBrush(frame) }, onHandoffPending = { handoffTick++ })
     }
-    // A replaced router (new tool) must stop listening to the Ink view, or the view keeps it,
-    // its tool controller and everything that controller references alive.
+    // A replaced router must stop listening to the Ink view, or the view keeps it and its tools alive.
     DisposableEffect(router) { onDispose { router.view = null } }
 
     Box(

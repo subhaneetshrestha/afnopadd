@@ -26,11 +26,15 @@ interface SheetStore {
 
     /**
      * Copies the closed sheet in [source] to [target] (which must not exist) under a new [id] and
-     * [title]; element ids are kept, timestamps restart. Returns the copy's metadata.
+     * [title]; element ids are kept, timestamps restart. Returns the copy's metadata. The copy is
+     * built in a sibling directory ending in [STAGING_SUFFIX] and renamed into place when complete.
      */
     suspend fun duplicate(source: File, target: File, id: SheetId, title: String): SheetMeta
 
     companion object {
         const val DATABASE_FILE_NAME = "sheet.db"
+
+        /** Suffix of a duplicate still being copied; such a directory is never a sheet and may be deleted. */
+        const val STAGING_SUFFIX = ".staging"
     }
 }

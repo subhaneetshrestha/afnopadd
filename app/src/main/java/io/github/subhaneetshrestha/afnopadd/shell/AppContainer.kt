@@ -14,6 +14,8 @@ import io.github.subhaneetshrestha.afnopadd.tools.ToolStyles
 import io.github.subhaneetshrestha.afnopadd.tools.presets.BuiltInPresets
 import io.github.subhaneetshrestha.afnopadd.library.internal.RoomSheetLibrary
 import io.github.subhaneetshrestha.afnopadd.library.internal.openLibraryDatabase
+import android.util.Log
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -25,8 +27,14 @@ import java.io.File
  */
 class AppContainer(val applicationContext: Context) {
 
-    /** Process-wide scope for work that must outlive a screen, such as closing a sheet. */
-    val appScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    /**
+     * Process-wide scope for work that must outlive a screen, such as closing a sheet. A failure
+     * there (a full disk while flushing, say) is logged, not allowed to crash the app: the work has
+     * no screen left to report to, and each job that matters reports through its own state.
+     */
+    val appScope: CoroutineScope = CoroutineScope(
+        SupervisorJob() + Dispatchers.Main.immediate + CoroutineExceptionHandler { _, e -> Log.e(TAG, "Background work failed", e) },
+    )
 
     val sheetStore: SheetStore by lazy { RoomSheetStore(applicationContext) }
 
@@ -50,6 +58,8 @@ class AppContainer(val applicationContext: Context) {
         )
     }
 }
+
+private const val TAG = "AppContainer"
 
 /** The app's single preferences file (recent colours now; settings in Task 19). */
 private val Context.settingsDataStore by preferencesDataStore(name = "settings")

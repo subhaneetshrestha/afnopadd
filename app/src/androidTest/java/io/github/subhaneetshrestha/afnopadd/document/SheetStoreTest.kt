@@ -8,6 +8,8 @@ import io.github.subhaneetshrestha.afnopadd.document.internal.db.openSheetDataba
 import io.github.subhaneetshrestha.afnopadd.document.internal.db.toElementEntity
 import io.github.subhaneetshrestha.afnopadd.document.internal.db.toStrokePointsEntity
 import io.github.subhaneetshrestha.afnopadd.document.internal.json.ElementJsonCodec
+import androidx.sqlite.driver.bundled.BundledSQLiteDriver
+import androidx.sqlite.execSQL
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
@@ -128,6 +130,69 @@ class SheetStoreTest {
         } catch (expected: SheetFormatException) {
             assertTrue(expected.message.orEmpty().contains("999"))
         }
+    }
+
+    private fun assertRejected(dir: File) = runBlocking {
+        for ((name, action) in listOf<Pair<String, suspend () -> Unit>>(
+            "open" to { store.open(dir).close() },
+            "inspect" to { store.inspect(dir) },
+        )) {
+            try {
+                action()
+                fail("$name should have thrown SheetFormatException")
+            } catch (expected: SheetFormatException) {
+                // The expected, recoverable failure: callers skip or report the sheet.
+            }
+        }
+    }
+
+    private fun userVersion(file: File): Long {
+        val connection = BundledSQLiteDriver().open(file.absolutePath)
+        try {
+            return connection.prepare("PRAGMA user_version").use { it.step(); it.getLong(0) }
+        } finally {
+            connection.close()
+        }
+    }
+
+    @Test
+    fun aFileThatIsNotADatabaseIsASheetFormatError() {
+        val dir = File(root, "garbage").apply { mkdirs() }
+        File(dir, SheetStore.DATABASE_FILE_NAME).writeBytes(ByteArray(4096) { (it * 31).toByte() })
+
+        assertRejected(dir)
+    }
+
+    @Test
+    fun aTruncatedDatabaseIsASheetFormatError() = runBlocking {
+        val dir = File(root, "truncated")
+        store.create(dir, title = "Truncated").close()
+        val file = File(dir, SheetStore.DATABASE_FILE_NAME)
+        file.writeBytes(file.readBytes().copyOf(1024))
+
+        assertRejected(dir)
+    }
+
+    @Test
+    fun aDatabaseFromANewerAppIsRejectedAndLeftUntouched() = runBlocking {
+        val dir = File(root, "newer")
+        store.create(dir, title = "Newer").close()
+        val file = File(dir, SheetStore.DATABASE_FILE_NAME)
+        BundledSQLiteDriver().open(file.absolutePath).apply { execSQL("PRAGMA user_version = 2"); close() }
+
+        assertRejected(dir)
+        assertEquals(2L, userVersion(file))
+    }
+
+    @Test
+    fun aForeignSqliteFileIsRejectedWithoutBeingModified() {
+        val dir = File(root, "foreign").apply { mkdirs() }
+        val file = File(dir, SheetStore.DATABASE_FILE_NAME)
+        BundledSQLiteDriver().open(file.absolutePath).apply { execSQL("CREATE TABLE notes(text TEXT)"); close() }
+        val before = file.readBytes()
+
+        assertRejected(dir)
+        assertTrue("the foreign file was modified", before.contentEquals(file.readBytes()))
     }
 
     @Test
