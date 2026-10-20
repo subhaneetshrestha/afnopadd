@@ -32,7 +32,7 @@ internal class StrokeCache(private val maxBytes: Long = DEFAULT_MAX_BYTES) {
         val cached = entries[element.id]
         if (cached != null && cached.points === element.points && cached.brushKey == element.brush) return cached.stroke
         val stroke = build(element)
-        val bytes = estimateBytes(element.points)
+        val bytes = estimateBytes(stroke, element.points)
         cached?.let { estimatedBytes -= it.bytes }
         entries[element.id] = Entry(element.points, element.brush, stroke, bytes)
         estimatedBytes += bytes
@@ -80,12 +80,35 @@ internal class StrokeCache(private val maxBytes: Long = DEFAULT_MAX_BYTES) {
         return Stroke(InkBridge.toInkBrush(element.brush), batch)
     }
 
-    private fun estimateBytes(points: StrokePoints): Long = BASE_BYTES + points.count.toLong() * BYTES_PER_POINT
+    /** Outline vertices of every stroke built so far; for calibrating [BYTES_PER_OUTLINE_VERTEX]. */
+    var outlineVerticesBuilt: Long = 0
+        private set
+
+    /**
+     * Mesh memory follows the stroke's outline: Ink's public API reports outline vertices (the
+     * vertex and triangle counts of the meshes themselves are restricted to the Ink library).
+     */
+    private fun estimateBytes(stroke: Stroke, points: StrokePoints): Long {
+        val shape = stroke.shape
+        var outlineVertices = 0L
+        for (group in 0 until shape.getRenderGroupCount()) {
+            for (outline in 0 until shape.getOutlineCount(group)) outlineVertices += shape.getOutlineVertexCount(group, outline)
+        }
+        outlineVerticesBuilt += outlineVertices
+        return BASE_BYTES + outlineVertices * BYTES_PER_OUTLINE_VERTEX + points.count.toLong() * INPUT_BYTES_PER_POINT
+    }
 
     private companion object {
         const val DEFAULT_MAX_BYTES = 48L * 1024 * 1024
-        /** Inputs (24 bytes) plus a tessellated mesh of a few vertices per sample. */
-        const val BYTES_PER_POINT = 160L
         const val BASE_BYTES = 512L
+        /** Ink's input batch keeps every sample (position, time, pressure, tilt, orientation). */
+        const val INPUT_BYTES_PER_POINT = 32L
+        /**
+         * Native memory per outline vertex, built and drawn. Measured on the API 36 emulator for
+         * 5,000 60-point strokes (280 outline vertices each), which cost 17.8 KB each once built and
+         * about 27 KB once drawn through `CanvasStrokeRenderer` (its own GPU-side copy); see
+         * docs/perf/PERF.md.
+         */
+        const val BYTES_PER_OUTLINE_VERTEX = 90L
     }
 }

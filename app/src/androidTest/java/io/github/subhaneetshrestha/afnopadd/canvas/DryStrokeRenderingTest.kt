@@ -189,12 +189,15 @@ class DryStrokeRenderingTest {
 
     @Test
     fun theStrokeCacheEvictsUnderItsBudgetAndRebuilds() {
-        val cache = StrokeCache(maxBytes = 64 * 1024)
         val elements = List(20) { horizontalStroke(0.0, 500.0, it * 10.0, sizeWorld = 4f) }
+        // Size the budget from a real stroke so the test follows the measured estimate: room for about five.
+        val perStroke = StrokeCache().also { it.strokeFor(elements.first()) }.estimatedBytes
+        val budget = perStroke * 5 + perStroke / 2
+        val cache = StrokeCache(maxBytes = budget)
 
         elements.forEach { cache.strokeFor(it) }
 
-        assertTrue("estimated ${cache.estimatedBytes} bytes", cache.estimatedBytes <= 64 * 1024)
+        assertTrue("estimated ${cache.estimatedBytes} bytes, budget $budget", cache.estimatedBytes <= budget)
         assertTrue(cache.size < elements.size)
         val rebuilt = cache.strokeFor(elements.first())
         assertEquals(elements.first().points.count, rebuilt.inputs.size)

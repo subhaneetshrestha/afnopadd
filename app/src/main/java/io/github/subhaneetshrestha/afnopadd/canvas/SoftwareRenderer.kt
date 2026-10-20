@@ -19,7 +19,9 @@ import kotlin.math.min
 /**
  * [Renderer] on a software canvas. Mirrors the on-screen dry layer (same Ink renderer, same frame
  * transforms) so a thumbnail or export looks like the screen. Safe to call from any thread; calls
- * are serialised because the stroke cache is not thread-safe.
+ * are serialised because the stroke cache is not thread-safe. The cache only lives for one call
+ * (all tiles of a tiled render share it): this renderer is process-wide, and keeping the meshes of
+ * the last thumbnailed sheet held about 34 MB of native memory for a 5,000-stroke sheet.
  */
 class SoftwareRenderer(private val maxBitmapPixels: Long = DEFAULT_MAX_BITMAP_PIXELS) : Renderer {
 
@@ -45,27 +47,35 @@ class SoftwareRenderer(private val maxBitmapPixels: Long = DEFAULT_MAX_BITMAP_PI
 
     override fun renderTo(canvas: Canvas, snapshot: ElementSnapshot, bounds: WorldRect, scalePxPerUnit: Double, background: Background) {
         synchronized(lock) {
-            val size = RenderGeometry.pixelSize(bounds, scalePxPerUnit)
-            drawBackground(canvas, background, bounds, scalePxPerUnit, size)
-            for (element in snapshot.ordered) {
-                if (element.bounds.right < bounds.left || element.bounds.left > bounds.right ||
-                    element.bounds.bottom < bounds.top || element.bounds.top > bounds.bottom
-                ) {
-                    continue
-                }
-                if (element is StrokeElement) {
-                    val matrix = CanvasMath.frameToRegion(bounds, scalePxPerUnit, element.anchor, element.frameLevel).toAndroidMatrix()
-                    val stroke = strokeCache.strokeFor(element)
-                    canvas.withMatrix(matrix) { strokeRenderer.draw(this, stroke, matrix) }
-                } else {
-                    canvas.drawRect(
-                        ((element.bounds.left - bounds.left) * scalePxPerUnit).toFloat(),
-                        ((element.bounds.top - bounds.top) * scalePxPerUnit).toFloat(),
-                        ((element.bounds.right - bounds.left) * scalePxPerUnit).toFloat(),
-                        ((element.bounds.bottom - bounds.top) * scalePxPerUnit).toFloat(),
-                        outlinePaint,
-                    )
-                }
+            try {
+                renderRegion(canvas, snapshot, bounds, scalePxPerUnit, background)
+            } finally {
+                strokeCache.clear()
+            }
+        }
+    }
+
+    private fun renderRegion(canvas: Canvas, snapshot: ElementSnapshot, bounds: WorldRect, scalePxPerUnit: Double, background: Background) {
+        val size = RenderGeometry.pixelSize(bounds, scalePxPerUnit)
+        drawBackground(canvas, background, bounds, scalePxPerUnit, size)
+        for (element in snapshot.ordered) {
+            if (element.bounds.right < bounds.left || element.bounds.left > bounds.right ||
+                element.bounds.bottom < bounds.top || element.bounds.top > bounds.bottom
+            ) {
+                continue
+            }
+            if (element is StrokeElement) {
+                val matrix = CanvasMath.frameToRegion(bounds, scalePxPerUnit, element.anchor, element.frameLevel).toAndroidMatrix()
+                val stroke = strokeCache.strokeFor(element)
+                canvas.withMatrix(matrix) { strokeRenderer.draw(this, stroke, matrix) }
+            } else {
+                canvas.drawRect(
+                    ((element.bounds.left - bounds.left) * scalePxPerUnit).toFloat(),
+                    ((element.bounds.top - bounds.top) * scalePxPerUnit).toFloat(),
+                    ((element.bounds.right - bounds.left) * scalePxPerUnit).toFloat(),
+                    ((element.bounds.bottom - bounds.top) * scalePxPerUnit).toFloat(),
+                    outlinePaint,
+                )
             }
         }
     }
@@ -79,6 +89,23 @@ class SoftwareRenderer(private val maxBitmapPixels: Long = DEFAULT_MAX_BITMAP_PI
         onTile: (RenderTile) -> Unit,
     ) {
         require(tileSizePx > 0) { "Tile size must be positive" }
+        synchronized(lock) {
+            try {
+                renderTiles(snapshot, bounds, scalePxPerUnit, background, tileSizePx, onTile)
+            } finally {
+                strokeCache.clear()
+            }
+        }
+    }
+
+    private fun renderTiles(
+        snapshot: ElementSnapshot,
+        bounds: WorldRect,
+        scalePxPerUnit: Double,
+        background: Background,
+        tileSizePx: Int,
+        onTile: (RenderTile) -> Unit,
+    ) {
         val size = RenderGeometry.pixelSize(bounds, scalePxPerUnit)
         var top = 0
         while (top < size.height) {
@@ -94,7 +121,7 @@ class SoftwareRenderer(private val maxBitmapPixels: Long = DEFAULT_MAX_BITMAP_PI
                 )
                 val bitmap = createBitmap(width, height)
                 try {
-                    renderTo(Canvas(bitmap), snapshot, tileBounds, scalePxPerUnit, background)
+                    renderRegion(Canvas(bitmap), snapshot, tileBounds, scalePxPerUnit, background)
                     onTile(RenderTile(left, top, bitmap))
                 } finally {
                     bitmap.recycle()

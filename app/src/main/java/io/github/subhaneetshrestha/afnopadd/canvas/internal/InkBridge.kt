@@ -29,15 +29,17 @@ internal object InkBridge {
     }
 
     /** Builds the Ink brush; the spec's opacity multiplies the colour's alpha. */
-    fun toInkBrush(spec: BrushSpec): Brush {
+    fun toInkBrush(spec: BrushSpec): Brush = Brush.createWithColorIntArgb(
+        family = brushFamily(spec.familyId),
+        colorIntArgb = colorIntArgb(spec),
+        size = spec.size,
+        epsilon = spec.epsilon,
+    )
+
+    /** The brush colour as an Android colour int with the spec's opacity folded into its alpha. */
+    fun colorIntArgb(spec: BrushSpec): Int {
         val alpha = ((spec.colorArgb ushr 24 and 0xFF) * spec.opacity.coerceIn(0f, 1f)).roundToInt().coerceIn(0, 255)
-        val argb = (alpha shl 24) or (spec.colorArgb and 0x00FFFFFF).toInt()
-        return Brush.createWithColorIntArgb(
-            family = brushFamily(spec.familyId),
-            colorIntArgb = argb,
-            size = spec.size,
-            epsilon = spec.epsilon,
-        )
+        return (alpha shl 24) or (spec.colorArgb and 0x00FFFFFF).toInt()
     }
 
     fun toInputToolType(kind: PointerKind): InputToolType = when (kind) {
