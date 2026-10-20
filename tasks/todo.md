@@ -419,14 +419,16 @@ Done 2026-10-20. Thumbnails are only re-rendered when the sheet changed since th
 **Description:** Add pencil, brush, and highlighter as tools backed by `ToolPreset` and `ParamValue`, the `BrushSpec` mapping (pencil = pressure pen at 60 percent opacity and 0.6x size; brush = marker at 2x; highlighter = highlighter at 40 percent), `CurrentStyle` state with per-tool memory, thickness presets (five) and slider (0.5 to 64 px) with screen-pixel to frame-unit conversion, and the tool options panel. Add the tools to the default layout.
 
 **Acceptance criteria:**
-- [ ] Each tool produces a `StrokeElement` whose `BrushSpec` matches the mapping table in `SPEC-drawing-tools.md`.
-- [ ] A 3 px thickness chosen at 10x zoom stores a frame-unit size that renders 3 px on screen at that zoom and 0.3 px at 1x.
-- [ ] Switching tools restores each tool's last thickness and colour.
+- [x] Each tool produces a `StrokeElement` whose `BrushSpec` matches the mapping table in `SPEC-drawing-tools.md`.
+- [x] A 3 px thickness chosen at 10x zoom stores a frame-unit size that renders 3 px on screen at that zoom and 0.3 px at 1x.
+- [x] Switching tools restores each tool's last thickness and colour (styles live in the app container for the session).
 
 **Verification:**
-- [ ] Tests pass: `.\gradlew.bat testDebugUnitTest --tests "*.tools.*"`
-- [ ] Build succeeds: `.\gradlew.bat assembleDebug`
-- [ ] Manual check: draw with all four stroke tools at several zooms
+- [x] Tests pass: `StrokeToolTest` (seven JVM tests), `StrokeOptionsBarTest`, and the pencil case in `EditorFlowTest`; full suite of 53 instrumented tests green on `afnopadd36`
+- [x] Build succeeds: `.\gradlew.bat assembleDebug`
+- [ ] Manual check: draw with all four stroke tools at several zooms (owner)
+
+Done 2026-10-20. The four tools are `ToolPreset`s of one `StrokeTool`, which is the shape user presets will take in the tool-config phase. Styles reset when the app restarts; persisting them belongs with the settings store in Task 19.
 
 **Dependencies:** Task 11
 

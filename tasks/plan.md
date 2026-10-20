@@ -58,7 +58,7 @@ T1 build plumbing ─┬─ T2 app shell skeleton ──────────
 - [x] Task 12: Library index and SheetLibrary (2026-10-20)
 - [x] Task 13: Library screen (new, continue, open older) (2026-10-20)
 - [x] Task 14: Off-screen renderer and thumbnails (2026-10-20)
-- [ ] Task 15: Stroke tool family, presets, thickness
+- [x] Task 15: Stroke tool family, presets, thickness (2026-10-20)
 - [ ] Task 16: Colour palette, picker, recents
 - [ ] Task 17: Spatial index, hit-testing, eraser
 - [ ] Task 18: Shape tools and rendering

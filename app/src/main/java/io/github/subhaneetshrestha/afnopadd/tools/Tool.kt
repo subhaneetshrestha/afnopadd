@@ -8,7 +8,6 @@ import io.github.subhaneetshrestha.afnopadd.canvas.StrokeFrame
 import io.github.subhaneetshrestha.afnopadd.document.BrushSpec
 import io.github.subhaneetshrestha.afnopadd.document.Sheet
 import io.github.subhaneetshrestha.afnopadd.document.Ulid
-import kotlinx.coroutines.flow.StateFlow
 import kotlin.random.Random
 
 enum class ToolCapability { STROKE, SHAPE, SELECT, ERASE, NAVIGATE }
@@ -45,14 +44,8 @@ interface ToolController : CanvasInputSink {
 class ToolContext(
     val sheet: Sheet,
     val camera: CameraController,
-    val style: StateFlow<CurrentStyle>,
+    val styles: ToolStyles,
     val clock: () -> Long = System::currentTimeMillis,
     val random: Random = Random.Default,
     val ulid: Ulid = Ulid.Default,
-)
-
-/** The colour and thickness the stroke tools draw with; thickness is chosen in screen pixels. */
-data class CurrentStyle(
-    val colorArgb: Long = 0xFF000000,
-    val widthPx: Float = 4f,
 )

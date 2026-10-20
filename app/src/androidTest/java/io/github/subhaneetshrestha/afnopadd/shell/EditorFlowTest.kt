@@ -85,6 +85,31 @@ class EditorFlowTest {
     }
 
     @Test
+    fun thePencilDrawsWithItsPreset() {
+        composeRule.onNodeWithTag(LibraryTags.NEW_SHEET).performClick()
+        composeRule.onNodeWithTag(ShellTags.EDITOR_CANVAS).assertIsDisplayed()
+        composeRule.onNodeWithTag(io.github.subhaneetshrestha.afnopadd.tools.ToolbarTags.item("tool:pencil")).performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) { lastOpened() != null }
+        val sheet = lastOpened()!!
+        composeRule.onNodeWithTag(ShellTags.EDITOR_CANVAS).performTouchInput {
+            down(Offset(200f, 400f))
+            moveTo(Offset(400f, 500f))
+            up()
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { strokeCount(sheet) == 1 }
+        leaveEditor()
+
+        val opened = runBlocking { container.sheetStore.open(sheet.dir) }
+        try {
+            val stroke = opened.snapshot.value.elements.values.single() as io.github.subhaneetshrestha.afnopadd.document.StrokeElement
+            assertEquals("ink:pressure-pen", stroke.brush.familyId)
+            assertEquals(0.6f, stroke.brush.opacity, 1e-6f)
+        } finally {
+            runBlocking { opened.close() }
+        }
+    }
+
+    @Test
     fun undoRemovesTheStrokeBeforeLeaving() {
         val sheet = createSheetAndDraw()
         composeRule.onNodeWithContentDescription(context.getString(R.string.command_undo)).performClick()

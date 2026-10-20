@@ -1,6 +1,7 @@
 package io.github.subhaneetshrestha.afnopadd.shell
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
@@ -29,15 +30,17 @@ import io.github.subhaneetshrestha.afnopadd.document.SheetFormatException
 import io.github.subhaneetshrestha.afnopadd.document.SheetId
 import io.github.subhaneetshrestha.afnopadd.tools.Command
 import io.github.subhaneetshrestha.afnopadd.tools.CommandRegistry
-import io.github.subhaneetshrestha.afnopadd.tools.CurrentStyle
+import io.github.subhaneetshrestha.afnopadd.tools.ToolCapability
 import io.github.subhaneetshrestha.afnopadd.tools.ToolContext
 import io.github.subhaneetshrestha.afnopadd.tools.ToolRegistry
 import io.github.subhaneetshrestha.afnopadd.tools.ToolbarHost
 import io.github.subhaneetshrestha.afnopadd.tools.ToolbarSpec
 import io.github.subhaneetshrestha.afnopadd.tools.ToolbarSpecJson
 import io.github.subhaneetshrestha.afnopadd.tools.ToolbarState
-import io.github.subhaneetshrestha.afnopadd.tools.pen.PenTool
-import kotlinx.coroutines.flow.MutableStateFlow
+import io.github.subhaneetshrestha.afnopadd.tools.options.StrokeOptionsBar
+import io.github.subhaneetshrestha.afnopadd.tools.presets.BuiltInPresets
+import io.github.subhaneetshrestha.afnopadd.tools.presets.BuiltInTools
+import io.github.subhaneetshrestha.afnopadd.tools.stroke.StrokeTool
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -97,15 +100,15 @@ fun EditorScreen(sheetId: String, modifier: Modifier = Modifier) {
 @Composable
 private fun EditorContent(sheet: Sheet, modifier: Modifier) {
     val context = LocalContext.current
+    val styles = LocalAppContainer.current.toolStyles
     val camera = remember(sheet) { CameraController() }
-    val style = remember { MutableStateFlow(CurrentStyle()) }
-    val toolContext = remember(sheet) { ToolContext(sheet, camera, style) }
-    val registry = remember { ToolRegistry().apply { register(PenTool()) } }
-    val toolbarState = remember { ToolbarState(initialToolId = PenTool.ID) }
+    val toolContext = remember(sheet) { ToolContext(sheet, camera, styles) }
+    val registry = remember { ToolRegistry().apply { BuiltInPresets.strokeTools.forEach { register(StrokeTool(it)) } } }
+    val toolbarState = remember { ToolbarState(initialToolId = BuiltInTools.PEN) }
     val activeToolId by toolbarState.activeToolId.collectAsState()
-    val controller = remember(activeToolId, toolContext) {
-        (registry.get(activeToolId) ?: registry.get(PenTool.ID)!!).createController(toolContext)
-    }
+    val activeTool = registry.get(activeToolId) ?: registry.get(BuiltInTools.PEN)!!
+    val controller = remember(activeTool, toolContext) { activeTool.createController(toolContext) }
+    val styleMap by styles.styles.collectAsState()
     DisposableEffect(controller) {
         controller.onActivated()
         onDispose { controller.onDeactivated() }
@@ -122,7 +125,17 @@ private fun EditorContent(sheet: Sheet, modifier: Modifier) {
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        bottomBar = { ToolbarHost(spec = spec, registry = registry, commands = commands, state = toolbarState) },
+        bottomBar = {
+            Column {
+                if (ToolCapability.STROKE in activeTool.capabilities) {
+                    StrokeOptionsBar(
+                        widthPx = styleMap[activeTool.id]?.widthPx ?: styles.styleFor(activeTool.id).widthPx,
+                        onWidthChange = { width -> styles.update(activeTool.id) { it.copy(widthPx = width) } },
+                    )
+                }
+                ToolbarHost(spec = spec, registry = registry, commands = commands, state = toolbarState)
+            }
+        },
     ) { innerPadding ->
         SheetCanvas(
             sheet = sheet,

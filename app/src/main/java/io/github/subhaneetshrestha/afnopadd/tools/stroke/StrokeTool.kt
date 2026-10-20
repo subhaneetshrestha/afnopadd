@@ -1,6 +1,5 @@
-package io.github.subhaneetshrestha.afnopadd.tools.pen
+package io.github.subhaneetshrestha.afnopadd.tools.stroke
 
-import io.github.subhaneetshrestha.afnopadd.R
 import io.github.subhaneetshrestha.afnopadd.canvas.CanvasPointerEvent
 import io.github.subhaneetshrestha.afnopadd.canvas.FinishedStroke
 import io.github.subhaneetshrestha.afnopadd.canvas.FrameLevels
@@ -16,37 +15,42 @@ import io.github.subhaneetshrestha.afnopadd.tools.Tool
 import io.github.subhaneetshrestha.afnopadd.tools.ToolCapability
 import io.github.subhaneetshrestha.afnopadd.tools.ToolContext
 import io.github.subhaneetshrestha.afnopadd.tools.ToolController
+import io.github.subhaneetshrestha.afnopadd.tools.presets.StrokeParams
+import io.github.subhaneetshrestha.afnopadd.tools.presets.ToolPreset
 
-/** The pen: a pressure-sensitive Ink stroke in the current colour and width. */
-class PenTool : Tool {
-    override val id = ID
-    override val labelRes = R.string.tool_pen
-    override val iconRes = R.drawable.ic_tool_pen
+/** A freehand Ink stroke tool configured entirely by a [ToolPreset] (pen, pencil, brush, highlighter). */
+class StrokeTool(private val preset: ToolPreset) : Tool {
+    override val id = preset.id
+    override val labelRes = preset.labelRes
+    override val iconRes = preset.iconRes
     override val capabilities = setOf(ToolCapability.STROKE)
 
-    override fun createController(context: ToolContext): ToolController = PenController(context)
+    override fun createController(context: ToolContext): ToolController = StrokeController(preset, context)
 
     companion object {
-        const val ID = "tool:pen"
-        const val FAMILY = "ink:pressure-pen"
         /** Ink's recommended quantisation for frames whose unit spans one to ten screen pixels. */
         const val EPSILON = 0.025f
     }
 }
 
-internal class PenController(private val context: ToolContext) : ToolController {
+internal class StrokeController(private val preset: ToolPreset, private val context: ToolContext) : ToolController {
 
-    /** Pointer samples are rendered by Ink's wet layer; the pen only cares about the finished stroke. */
+    private val family = preset.text(StrokeParams.FAMILY, "ink:pressure-pen")
+    private val sizeMultiplier = preset.number(StrokeParams.SIZE_MULTIPLIER, 1.0)
+    private val opacity = preset.number(StrokeParams.OPACITY, 1.0).toFloat()
+    private val forceOpaqueColor = preset.flag(StrokeParams.FORCE_OPAQUE_COLOR)
+
+    /** Pointer samples are rendered by Ink's wet layer; the tool only cares about the finished stroke. */
     override fun onPointer(event: CanvasPointerEvent) = Unit
 
     override fun wetStrokeBrush(frame: StrokeFrame): BrushSpec {
-        val style = context.style.value
+        val style = context.styles.styleFor(preset.id)
         return BrushSpec(
-            familyId = PenTool.FAMILY,
-            size = (style.widthPx / frame.transform.scale).toFloat(),
-            colorArgb = style.colorArgb,
-            opacity = 1f,
-            epsilon = PenTool.EPSILON,
+            familyId = family,
+            size = (style.widthPx * sizeMultiplier / frame.transform.scale).toFloat(),
+            colorArgb = if (forceOpaqueColor) style.colorArgb or 0xFF000000 else style.colorArgb,
+            opacity = opacity,
+            epsilon = StrokeTool.EPSILON,
         )
     }
 
@@ -70,7 +74,7 @@ internal class PenController(private val context: ToolContext) : ToolController 
             brush = brush,
             points = points,
         )
-        sheet.transact(label = "Pen stroke") { add(element) }
+        sheet.transact(label = "Stroke") { add(element) }
     }
 
     private fun boundsOf(frame: StrokeFrame, points: StrokePoints, brush: BrushSpec): WorldRect {

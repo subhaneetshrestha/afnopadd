@@ -7,6 +7,9 @@
       "placement": "bottom",
       "items": [
         { "ref": "tool:pen" },
+        { "ref": "tool:pencil" },
+        { "ref": "tool:brush" },
+        { "ref": "tool:highlighter" },
         { "separator": true },
         { "ref": "cmd:undo" },
         { "ref": "cmd:redo" }

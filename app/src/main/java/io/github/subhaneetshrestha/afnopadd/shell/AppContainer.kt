@@ -8,6 +8,8 @@ import io.github.subhaneetshrestha.afnopadd.canvas.SoftwareRenderer
 import io.github.subhaneetshrestha.afnopadd.document.SheetStore
 import io.github.subhaneetshrestha.afnopadd.document.internal.RoomSheetStore
 import io.github.subhaneetshrestha.afnopadd.library.SheetLibrary
+import io.github.subhaneetshrestha.afnopadd.tools.ToolStyles
+import io.github.subhaneetshrestha.afnopadd.tools.presets.BuiltInPresets
 import io.github.subhaneetshrestha.afnopadd.library.internal.RoomSheetLibrary
 import io.github.subhaneetshrestha.afnopadd.library.internal.openLibraryDatabase
 import kotlinx.coroutines.CoroutineScope
@@ -29,6 +31,9 @@ class AppContainer(val applicationContext: Context) {
     val renderer: Renderer by lazy { SoftwareRenderer() }
 
     val thumbnails: ThumbnailWriter by lazy { ThumbnailWriter(renderer) }
+
+    /** Per-tool colour and width, kept for the whole session so they carry across sheets. */
+    val toolStyles: ToolStyles = ToolStyles(BuiltInPresets.defaultStyles)
 
     val library: SheetLibrary by lazy {
         RoomSheetLibrary(
