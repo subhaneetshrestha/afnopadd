@@ -91,14 +91,16 @@ Done 2026-10-20. Fractional indexes use an integer-plus-fraction scheme, so 10,0
 **Description:** Implement `Sheet`, `Transaction`, `ElementSnapshot` (persistent map plus z-ordered list), diff generation (before/after per element), the undo/redo stack capped at 200 entries, and a `SheetWriter` hook that receives committed diffs (a no-op writer for now). Snapshots publish through `StateFlow` immediately on commit.
 
 **Acceptance criteria:**
-- [ ] A transaction that adds, updates, and deletes elements yields exactly those diffs; an empty transaction is dropped; `undo` then `redo` restores the identical snapshot.
-- [ ] `canUndo`/`canRedo` flows are correct through 250 transactions (cap honoured, oldest dropped).
-- [ ] Diffs reach the `SheetWriter` in commit order with a shared transaction id and label.
+- [x] A transaction that adds, updates, and deletes elements yields exactly those diffs; an empty transaction is dropped; `undo` then `redo` restores the identical snapshot.
+- [x] `canUndo`/`canRedo` flows are correct through 250 transactions (cap honoured, oldest dropped).
+- [x] Diffs reach the `SheetWriter` in commit order with a shared transaction id and label.
 
 **Verification:**
-- [ ] Tests pass: `.\gradlew.bat testDebugUnitTest --tests "*.document.*"`
-- [ ] Build succeeds: `.\gradlew.bat assembleDebug`
-- [ ] Manual check: none
+- [x] Tests pass: `.\gradlew.bat testDebugUnitTest --tests "*.document.*"` (14 transaction tests)
+- [x] Build succeeds: `.\gradlew.bat assembleDebug`
+- [x] Manual check: none
+
+Done 2026-10-20. Undo and redo are written as inverse transactions (`kind`, `inverseOf`) so the op log stays append-only; a throwing or invalid transaction applies nothing.
 
 **Dependencies:** Task 3
 
