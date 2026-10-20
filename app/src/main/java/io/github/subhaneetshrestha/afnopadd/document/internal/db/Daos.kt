@@ -14,6 +14,9 @@ interface ElementDao {
     @Query("SELECT COUNT(*) FROM element WHERE deleted = 1")
     suspend fun countTombstones(): Long
 
+    @Query("SELECT COUNT(*) FROM element WHERE deleted = 0")
+    suspend fun countLive(): Long
+
     @Upsert
     suspend fun upsertAll(entities: List<ElementEntity>)
 }

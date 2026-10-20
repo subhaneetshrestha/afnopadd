@@ -55,7 +55,7 @@ T1 build plumbing ─┬─ T2 app shell skeleton ──────────
 - [ ] Draw with the pen, pinch zoom, undo, kill the process, reopen: strokes are intact. Verified on the API 36 emulator by tests; owner reviews on a device before Phase 1.
 
 ### Phase 1: Library and the full tool set
-- [ ] Task 12: Library index and SheetLibrary
+- [x] Task 12: Library index and SheetLibrary (2026-10-20)
 - [ ] Task 13: Library screen (new, continue, open older)
 - [ ] Task 14: Off-screen renderer and thumbnails
 - [ ] Task 15: Stroke tool family, presets, thickness

@@ -9,6 +9,7 @@ import io.github.subhaneetshrestha.afnopadd.document.SHEET_SCHEMA_VERSION
 import io.github.subhaneetshrestha.afnopadd.document.Sheet
 import io.github.subhaneetshrestha.afnopadd.document.SheetFormatException
 import io.github.subhaneetshrestha.afnopadd.document.SheetId
+import io.github.subhaneetshrestha.afnopadd.document.SheetInfo
 import io.github.subhaneetshrestha.afnopadd.document.SheetMeta
 import io.github.subhaneetshrestha.afnopadd.document.SheetStore
 import io.github.subhaneetshrestha.afnopadd.document.StrokePoints
@@ -35,14 +36,14 @@ internal class RoomSheetStore(
     private val beforeCommit: suspend (CommittedTransaction) -> Unit = {},
 ) : SheetStore {
 
-    override suspend fun create(dir: File, title: String): Sheet {
+    override suspend fun create(dir: File, title: String, id: SheetId?): Sheet {
         val file = File(dir, SheetStore.DATABASE_FILE_NAME)
         require(!file.exists()) { "A sheet already exists at $file" }
         check(dir.isDirectory || dir.mkdirs()) { "Could not create sheet directory $dir" }
         val database = openSheetDatabase(context, file)
         try {
             val now = clock()
-            val meta = SheetMeta(id = SheetId(ulid.next()), title = title, createdAt = now, updatedAt = now)
+            val meta = SheetMeta(id = id ?: SheetId(ulid.next()), title = title, createdAt = now, updatedAt = now)
             database.metaDao().upsertAll(
                 listOf(
                     MetaEntity(META_SCHEMA_VERSION, meta.schemaVersion.toString()),
@@ -87,6 +88,43 @@ internal class RoomSheetStore(
             return newSheet(meta, elements, database, dir)
         } catch (e: Throwable) {
             database.close()
+            throw e
+        }
+    }
+
+    override suspend fun inspect(dir: File): SheetInfo {
+        val file = File(dir, SheetStore.DATABASE_FILE_NAME)
+        if (!file.isFile) throw SheetFormatException("No sheet database at $file")
+        val database = openSheetDatabase(context, file)
+        try {
+            return SheetInfo(readMeta(database), database.elementDao().countLive().toInt())
+        } finally {
+            database.close()
+        }
+    }
+
+    override suspend fun duplicate(source: File, target: File, id: SheetId, title: String): SheetMeta {
+        if (!File(source, SheetStore.DATABASE_FILE_NAME).isFile) throw SheetFormatException("No sheet database in $source")
+        require(!target.exists()) { "Duplicate target $target already exists" }
+        try {
+            withContext(Dispatchers.IO) { source.copyRecursively(target) }
+            val database = openSheetDatabase(context, File(target, SheetStore.DATABASE_FILE_NAME))
+            try {
+                val now = clock().toString()
+                database.metaDao().upsertAll(
+                    listOf(
+                        MetaEntity(META_SHEET_ID, id.value),
+                        MetaEntity(META_TITLE, title),
+                        MetaEntity(META_CREATED_AT, now),
+                        MetaEntity(META_UPDATED_AT, now),
+                    ),
+                )
+                return readMeta(database)
+            } finally {
+                database.close()
+            }
+        } catch (e: Throwable) {
+            target.deleteRecursively()
             throw e
         }
     }

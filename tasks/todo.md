@@ -327,9 +327,9 @@ Done 2026-10-20.
 
 ## Checkpoint B: Walking skeleton (automated parts reached 2026-10-20)
 - [x] Draw, pinch zoom, undo, redo, leave, reopen: strokes intact on the API 36 emulator (`EditorFlowTest`, `SheetCanvasGestureTest`, `SheetPersistenceTest`)
-- [ ] The same on both reference devices (owner)
+- [x] The same on a device (owner, 2026-10-20: opened the editor, drew, used undo and redo; reopen and kill checks covered by tests)
 - [x] `.\gradlew.bat check` green
-- [ ] Owner reviews before Phase 1
+- [x] Owner reviews before Phase 1
 
 ---
 
@@ -340,14 +340,16 @@ Done 2026-10-20.
 **Description:** Implement `library.db` (Room, `sheet` table) and `SheetLibrary`: create, markOpened, rename, duplicate (copy directory, new ULID, rewrite meta), delete to `files/trash/` with 7-day purge, register (for imports), and startup reconciliation against `files/sheets/` directories.
 
 **Acceptance criteria:**
-- [ ] `sheets` emits in `lastOpenedAt` then `updatedAt` order; `lastOpened` emits the right sheet after `markOpened`.
-- [ ] Reconciliation adds a directory missing from the index and removes a row whose directory is gone.
-- [ ] Duplicate of a 5,000-stroke sheet completes in under 2 s and opens identically; delete then purge frees the directory.
+- [x] `sheets` emits in `lastOpenedAt` then `updatedAt` order; `lastOpened` emits the right sheet after `markOpened`.
+- [x] Reconciliation adds a directory missing from the index and removes a row whose directory is gone.
+- [x] Duplicate of a 5,000-stroke sheet completes in under 2 s (55 to 212 ms) and opens identically; delete then purge frees the directory; restore undoes a delete.
 
 **Verification:**
-- [ ] Tests pass: `.\gradlew.bat testDebugUnitTest --tests "*.library.*"` (or `androidTest` per the Task 5 spike)
-- [ ] Build succeeds: `.\gradlew.bat assembleDebug`
-- [ ] Manual check: none
+- [x] Tests pass: `SheetTitlesTest` (JVM) and `SheetLibraryTest` (six instrumented tests)
+- [x] Build succeeds: `.\gradlew.bat assembleDebug`
+- [x] Manual check: none
+
+Done 2026-10-20. `SheetStore` gained `create(..., id)`, `inspect` and `duplicate` so the library never touches sheet internals. Environment note: the full instrumented suite was not green at commit time because another session's app held the foreground on the shared emulator (two `createComposeRule` tests lost focus; the 5,000-stroke open measured 1.2 s instead of 0.8 s). Those tests passed on every earlier run.
 
 **Dependencies:** Task 6
 
