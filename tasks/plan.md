@@ -71,7 +71,7 @@ T1 build plumbing ─┬─ T2 app shell skeleton ──────────
 ### Phase 2: Selection, images, deep-zoom performance
 - [x] Task 20: Select tool: selection, marquee, move, delete, duplicate, z-order
 - [x] Task 21: Select tool: scale and rotate handles
-- [ ] Task 22: Image import pipeline
+- [x] Task 22: Image import pipeline
 - [ ] Task 23: Image rendering, crop mode, arrange in row
 - [ ] Task 24: Tile pyramid cache and level of detail
 - [ ] Task 25: Deep-zoom hardening and performance fixture

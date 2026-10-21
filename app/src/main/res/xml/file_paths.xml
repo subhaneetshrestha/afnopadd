@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Files shared with other apps through the FileProvider: only photos the system camera writes for us. -->
+<paths>
+    <cache-path name="camera" path="camera/" />
+</paths>

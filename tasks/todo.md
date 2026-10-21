@@ -638,14 +638,16 @@ Done 2026-10-21.
 **Description:** Implement `rememberImagePicker` (photo picker for up to 20 images, documents UI, system camera via `TakePicture` with a FileProvider) and `ImageImporter`: stream bytes into `AssetStore`, decode bounds, downsample to at most 4,096 px, bake EXIF orientation, re-encode (JPEG 90 opaque, lossless WebP with alpha), and create `ImageElement`s placed at the viewport centre (single) or in a row (many) at 60 percent of the shorter viewport side.
 
 **Acceptance criteria:**
-- [ ] Fixtures: an EXIF-rotated JPEG imports upright; a PNG with alpha keeps transparency; a 48-megapixel JPEG lands at 4,096 px; an unsupported file yields a per-file error and the batch continues.
-- [ ] Importing 20 photos of 12 megapixels completes in under 10 s on the reference phone with peak memory under 300 MB.
-- [ ] No image or storage permission appears in the merged manifest.
+- [x] Fixtures: an EXIF-rotated JPEG imports upright; a PNG with alpha keeps transparency; a 48-megapixel JPEG lands at 4,096 px; an unsupported file yields a per-file error and the batch continues (`ImageImporterTest`, fixtures generated in the test; a missing file is reported as unreadable, and a small upright image is stored byte for byte).
+- [ ] Importing 20 photos of 12 megapixels completes in under 10 s on the reference phone with peak memory under 300 MB. Emulator (`ImageImportPerfTest`, half the photos EXIF-rotated so they take the re-encode path): 5.1 s, peak 100 MB (+92 MB over baseline). Reference phone pending (owner).
+- [x] No image or storage permission appears in the merged manifest (`ImagePickerTest` reads the installed app's requested permissions: no `READ_MEDIA_*`, storage, camera or media-location permission).
 
 **Verification:**
-- [ ] Tests pass: `connectedDebugAndroidTest` for the images package; unit tests for placement math
-- [ ] Build succeeds: `.\gradlew.bat assembleDebug`
-- [ ] Manual check: import from gallery, files, and camera
+- [x] Tests pass: `connectedDebugAndroidTest` for the images package (12); unit tests for placement math and the import summary (`ImagePlacementTest`, 4); `.\gradlew.bat check` (226, Lint); full suite 135/135 on a cold `afnopadd36`. Mutation checks: ignoring EXIF and skipping the downscale each fail a fixture test.
+- [x] Build succeeds: `.\gradlew.bat assembleDebug`
+- [ ] Manual check: import from gallery, files, and camera (owner; needs the `cmd:image-import` toolbar entry from Task 23)
+
+Notes: `ImageDecoder` decodes and turns the image and scales it straight to the 4,096 px cap (exactly 4,096, rather than the nearest power-of-two sample size the spec mentions), so a 48 MP photo never sits in memory at full size. Images with alpha are stored as lossless WebP on API 30+ and PNG on API 29, which cannot write lossless WebP. `Placement` carries the viewport's shorter side and the gap in world units, since the 60 percent box and the 16 dp gap depend on them, and its fraction is a `Double`. The picker (`rememberImagePicker`) wraps the photo picker (up to 20), the documents UI, and `TakePicture` into a cache file shared through a FileProvider (`<applicationId>.files`, cache `camera/` only; files older than a day are cleared). The picker and importer are not wired into the editor yet; `cmd:image-import` and image drawing are Task 23.
 
 **Dependencies:** Task 6, Task 11
 
@@ -654,6 +656,8 @@ Done 2026-10-21.
 - `app/src/main/AndroidManifest.xml`, `app/src/main/res/xml/file_paths.xml`
 
 **Estimated scope:** Medium
+
+Done 2026-10-21 (reference-phone timing pending).
 
 ---
 

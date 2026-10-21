@@ -23,6 +23,8 @@ sealed interface ImageSource { data object PhotoPicker : ImageSource; data objec
 data class Placement(val center: WorldPoint, val frameLevel: Int, val maxSizeFraction: Float = 0.6f)
 ```
 
+As built in Task 22: `Placement(center, frameLevel, shortSideWorld, gapWorld, maxSizeFraction: Double = 0.6)` (the box and the gap need the viewport's shorter side and the 16 dp gap in world units); `ImageImporter.import(sources, sheet, placement, onProgress)` returns an `ImportSummary` of `ImportResult.Imported(source, id)` or `ImportResult.Failed(source, ImportFailure)` with `UNSUPPORTED`, `UNREADABLE` or `NOT_STORED`, and adds the batch as one transaction. An upright JPEG, PNG or WebP within the cap is stored byte for byte.
+
 Image-specific commands registered with `CommandRegistry`: `cmd:image-import`, `cmd:image-crop`, `cmd:image-reset-crop`, `cmd:arrange-row` (`cmd:arrange-grid` is deferred past v1).
 
 ## Design decisions

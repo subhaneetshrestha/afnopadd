@@ -19,6 +19,17 @@
             </intent-filter>
         </activity>
 
+        <!-- Lets the system camera write a photo into our cache (TakePicture); no permission involved. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
     </application>
 
 </manifest>
