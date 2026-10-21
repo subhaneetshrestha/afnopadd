@@ -28,7 +28,7 @@ data class Toolbar(
 )
 
 sealed interface ToolbarItem {
-    /** A tool (`tool:`), preset (`preset:`) or command (`cmd:`) by id; unknown ids render nothing. */
+    /** A tool (`tool:`), preset (`preset:`), command (`cmd:`) or host-supplied widget (`widget:zoom`) by id; unknown ids render nothing. */
     data class Ref(val id: String) : ToolbarItem
 
     data object Separator : ToolbarItem

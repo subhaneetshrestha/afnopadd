@@ -43,4 +43,10 @@
     <string name="tool_ellipse">Ellipse</string>
     <string name="command_undo">Undo</string>
     <string name="command_redo">Redo</string>
+    <string name="tool_hand">Hand</string>
+    <string name="command_zoom_in">Zoom in</string>
+    <string name="command_zoom_out">Zoom out</string>
+    <string name="command_zoom_fit">Fit to content</string>
+    <string name="command_zoom_100">Actual size (100%)</string>
+    <string name="zoom_readout_description">Zoom %1$s, open zoom controls</string>
 </resources>

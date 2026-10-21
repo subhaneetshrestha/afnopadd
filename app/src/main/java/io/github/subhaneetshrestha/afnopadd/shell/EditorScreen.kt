@@ -52,6 +52,17 @@ import io.github.subhaneetshrestha.afnopadd.tools.ToolbarState
 import io.github.subhaneetshrestha.afnopadd.tools.color.ColorPickerDialog
 import io.github.subhaneetshrestha.afnopadd.tools.eraser.EraserTool
 import io.github.subhaneetshrestha.afnopadd.tools.shape.ShapeTools
+import io.github.subhaneetshrestha.afnopadd.tools.InputPolicy
+import io.github.subhaneetshrestha.afnopadd.tools.ZoomReadout
+import io.github.subhaneetshrestha.afnopadd.tools.commands.ZoomCommands
+import io.github.subhaneetshrestha.afnopadd.tools.hand.HandTool
+import io.github.subhaneetshrestha.afnopadd.shell.settings.Settings
+import io.github.subhaneetshrestha.afnopadd.canvas.CameraAnimator
+import io.github.subhaneetshrestha.afnopadd.canvas.PointerKind
+import io.github.subhaneetshrestha.afnopadd.canvas.PointerRole
+import io.github.subhaneetshrestha.afnopadd.canvas.Viewport
+import androidx.compose.ui.platform.LocalView
+import kotlinx.coroutines.Job
 import io.github.subhaneetshrestha.afnopadd.tools.options.StrokeOptionsBar
 import io.github.subhaneetshrestha.afnopadd.tools.presets.BuiltInPresets
 import io.github.subhaneetshrestha.afnopadd.tools.presets.BuiltInTools
@@ -149,6 +160,7 @@ private fun EditorContent(sheet: Sheet, camera: CameraController, modifier: Modi
             BuiltInPresets.strokeTools.forEach { register(StrokeTool(it)) }
             register(EraserTool())
             ShapeTools.all.forEach { register(it) }
+            register(HandTool())
         }
     }
     // The selected tool survives rotation and process death with the rest of the editor's saved state.
@@ -169,11 +181,40 @@ private fun EditorContent(sheet: Sheet, camera: CameraController, modifier: Modi
         controller.onActivated()
         onDispose { controller.onDeactivated() }
     }
-    val commands = remember(sheet) {
+    // Null until the settings file has been read; the defaults stand in meanwhile.
+    val settings = container.settings.settings.collectAsState(initial = null).value ?: Settings()
+    val view = LocalView.current
+    DisposableEffect(view, settings.keepScreenOn) {
+        view.keepScreenOn = settings.keepScreenOn
+        onDispose { view.keepScreenOn = false }
+    }
+    // The canvas's size, for zoom commands; not state, since nothing redraws when it changes.
+    val viewport = remember { arrayOf(Viewport(0, 0)) }
+    val commands = remember(sheet, camera) {
+        val animator = CameraAnimator(camera)
+        var zoomAnimation: Job? = null
         CommandRegistry().apply {
             register(Command("cmd:undo", R.string.command_undo, R.drawable.ic_undo, sheet.canUndo) { sheet.undo() })
             register(Command("cmd:redo", R.string.command_redo, R.drawable.ic_redo, sheet.canRedo) { sheet.redo() })
+            ZoomCommands(
+                camera = camera,
+                viewport = { viewport[0] },
+                contentBounds = { ZoomCommands.boundsOf(sheet.snapshot.value.elements.values.map { it.bounds }) },
+                animateTo = { target ->
+                    zoomAnimation?.cancel()
+                    zoomAnimation = scope.launch { animator.animateTo(target) }
+                },
+            ).all.forEach(::register)
         }
+    }
+    // Asked once per gesture by the canvas: the first stylus touch flips finger mode AUTO to panning, for good.
+    var stylusMarked by remember { mutableStateOf(false) }
+    val pointerRole: (PointerKind) -> PointerRole = { kind ->
+        if (InputPolicy.isStylus(kind) && !settings.stylusSeen && !stylusMarked) {
+            stylusMarked = true
+            scope.launch { container.settings.update { it.copy(stylusSeen = true) } }
+        }
+        InputPolicy.roleFor(kind, activeTool.capabilities, settings.fingerMode, settings.stylusSeen || stylusMarked)
     }
     val spec: ToolbarSpec = remember {
         ToolbarSpecJson.parse(context.assets.open(DEFAULT_LAYOUT_ASSET).bufferedReader().use { it.readText() })
@@ -189,7 +230,10 @@ private fun EditorContent(sheet: Sheet, camera: CameraController, modifier: Modi
             cameraController = camera,
             inputSink = controller,
             modifier = Modifier.fillMaxSize().statusBarsPadding().testTag(ShellTags.EDITOR_CANVAS),
+            background = settings.defaultBackground,
+            pointerRole = pointerRole,
             wetStrokeBrush = controller::wetStrokeBrush,
+            onViewportChanged = { viewport[0] = it },
             index = index,
             hiddenElements = hiddenElements,
             previewElements = previewElements,
@@ -219,10 +263,23 @@ private fun EditorContent(sheet: Sheet, camera: CameraController, modifier: Modi
                         )
                     }
                 }
-                ToolbarHost(spec = spec, registry = registry, commands = commands, state = toolbarState)
+                ToolbarHost(
+                    spec = spec,
+                    registry = registry,
+                    commands = commands,
+                    state = toolbarState,
+                    widgets = mapOf(
+                        ZOOM_WIDGET to {
+                            // Read here, so a pan or zoom recomposes only the readout.
+                            val zoom by camera.camera.collectAsState()
+                            ZoomReadout(zoom.zoom, commands)
+                        },
+                    ),
+                )
             }
         }
     }
 }
 
 private const val DEFAULT_LAYOUT_ASSET = "tool_layout_default.json"
+private const val ZOOM_WIDGET = "widget:zoom"

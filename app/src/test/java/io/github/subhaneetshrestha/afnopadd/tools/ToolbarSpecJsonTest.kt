@@ -15,12 +15,14 @@ class ToolbarSpecJsonTest {
         val spec = ToolbarSpecJson.parse(text)
 
         assertEquals(1, spec.schemaVersion)
-        val main = spec.toolbars.single()
-        assertEquals("main", main.id)
-        assertEquals(Placement.BOTTOM, main.placement)
-        assertTrue(ToolbarItem.Ref("tool:pen") in main.items)
-        assertTrue(ToolbarItem.Ref("cmd:undo") in main.items)
-        assertTrue(ToolbarItem.Ref("cmd:redo") in main.items)
+        // Two short rows rather than one that runs off a phone screen.
+        assertEquals(listOf("draw", "shapes-and-actions"), spec.toolbars.map { it.id })
+        assertTrue(spec.toolbars.all { it.placement == Placement.BOTTOM })
+        val items = spec.toolbars.flatMap { it.items }
+        for (id in listOf("tool:hand", "tool:pen", "tool:eraser", "tool:rect", "cmd:undo", "cmd:redo", "widget:zoom")) {
+            assertTrue("$id missing", ToolbarItem.Ref(id) in items)
+        }
+        assertTrue("no row over ten items", spec.toolbars.all { it.items.size <= 10 })
     }
 
     private fun layout(items: String, schemaVersion: String = "1") =

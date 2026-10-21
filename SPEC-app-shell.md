@@ -18,8 +18,10 @@ The frame everything else hangs on: the activity, navigation between the library
 class AppContainer(context: Context) { val sheetStore: SheetStore; val library: SheetLibrary; val toolRegistry: ToolRegistry; val commands: CommandRegistry; val exporter: Exporter; val settings: SettingsRepository }
 sealed interface Destination { data object Library : Destination; data class Editor(val sheetId: SheetId) : Destination; data object Settings : Destination; data object About : Destination }
 interface SettingsRepository { val settings: Flow<Settings>; suspend fun update(block: (Settings) -> Settings) }
-data class Settings(val fingerMode: FingerMode = FingerMode.AUTO, val toolbarPlacement: Placement = Placement.AUTO, val defaultBackground: Background = Background.PLAIN, val keepScreenOn: Boolean = true)
+data class Settings(val fingerMode: FingerMode = FingerMode.AUTO, val toolbarPlacement: ToolbarPlacement = ToolbarPlacement.AUTO, val defaultBackground: Background = Background.PLAIN, val keepScreenOn: Boolean = true, val leftHanded: Boolean = false, val stylusSeen: Boolean = false)
 ```
+
+As built in Task 19: `FingerMode { AUTO, DRAW, NAVIGATE }` lives in `drawing-tools` (`tools/InputPolicy.kt`), `ToolbarPlacement { AUTO, BOTTOM, SIDE }` in `shell/settings` (the toolbar spec's own `Placement` has no AUTO), and the persisted "stylus seen" flag is part of `Settings`. Settings share the `settings` preferences file with the recent colours; enums are stored by name and an unknown name reads as the default.
 
 ## Design decisions
 

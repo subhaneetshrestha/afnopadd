@@ -544,14 +544,16 @@ Done 2026-10-21.
 **Description:** Add the hand tool (one pointer pans, two pinch-zoom, never edits), the zoom commands (`cmd:zoom-in`, `cmd:zoom-out`, `cmd:zoom-fit`, `cmd:zoom-100`) with the zoom readout, `SettingsRepository` on DataStore (`fingerMode`, `toolbarPlacement`, `defaultBackground`, `keepScreenOn`, `leftHanded`), the persisted "stylus seen" flag, and the input policy that decides whether a single finger draws or pans.
 
 **Acceptance criteria:**
-- [ ] The hand tool changes only the camera; the sheet's transaction count stays zero during its use.
-- [ ] In AUTO mode a finger draws until a stylus pointer is seen; afterwards a finger pans and the stylus draws; forcing either mode in settings overrides this.
-- [ ] Zoom in/out step by 1.5x around the viewport centre with animation; fit frames all content with padding; 100 percent returns to 1x.
+- [x] The hand tool changes only the camera; the sheet's transaction count stays zero during its use (`HandToolTest`; `EditorFlowTest.theHandToolPansWithoutChangingTheSheet` with finger and stylus: camera moves, no elements, undo stays disabled).
+- [x] In AUTO mode a finger draws until a stylus pointer is seen; afterwards a finger pans and the stylus draws; forcing either mode in settings overrides this (`InputPolicyTest`; `EditorFlowTest.aFingerDrawsUntilAStylusIsSeenThenPans` with real stylus events, and `forcingFingerDrawingOverridesASeenStylus`).
+- [x] Zoom in/out step by 1.5x around the viewport centre with animation; fit frames all content with padding; 100 percent returns to 1x (`ZoomCommandsTest`, `CameraAnimatorTest`: 150 ms ease-in-out, geometric in zoom; `EditorFlowTest.theZoomReadoutZoomsInAndFitsTheContent`).
 
 **Verification:**
-- [ ] Tests pass: `.\gradlew.bat testDebugUnitTest --tests "*.tools.*"` (hand tool, policy) and `"*.shell.*"` (settings)
-- [ ] Build succeeds: `.\gradlew.bat assembleDebug`
-- [ ] Manual check: hand tool and finger policy on both devices
+- [x] Tests pass: `.\gradlew.bat check` (183 unit tests, Lint); instrumented `ToolbarHostTest` (6), `SettingsRepositoryTest` (2), `EditorFlowTest` (13). Full suite on a cold `afnopadd36`: 112/114; the two failures were the new `SettingsRepositoryTest` reopening its file before the old DataStore had let go (it cancelled its scope without waiting). Fixed with `cancelAndJoin` there and in `RecentColorsStoreTest`, which had the same latent race; both then passed three runs in a row. Mutation checks: not recording the stylus fails the finger-policy flow; ignoring the active tool in the policy fails the hand-tool flow.
+- [x] Build succeeds: `.\gradlew.bat assembleDebug`
+- [ ] Manual check: hand tool and finger policy on both devices (owner)
+
+Notes: the default layout is now two rows (hand and stroke tools; shapes, undo, redo and the zoom readout), so nothing sits off-screen on a 411 dp phone. The readout is a `widget:zoom` ref rendered from a widget the editor supplies. Settings applied so far: finger mode, the stylus flag, keep-screen-on and the default background (used for every sheet until sheets carry their own); toolbar placement and left-handed mode are stored for the side-rail work. The settings screen itself is Task 30's. Not done here: persisting per-tool colour and width (Task 15's note pointed at this task, but it is not in the acceptance criteria); they still reset when the app restarts. `SheetCanvas` now hands its gesture handler one stable role function, so a settings change mid-stroke cannot restart the handler and cut the stroke.
 
 **Dependencies:** Task 17
 
@@ -561,6 +563,8 @@ Done 2026-10-21.
 - `app/src/main/assets/tool_layout_default.json`
 
 **Estimated scope:** Medium
+
+Done 2026-10-21.
 
 ---
 

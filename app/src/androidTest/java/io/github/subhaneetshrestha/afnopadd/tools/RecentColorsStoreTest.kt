@@ -7,7 +7,7 @@ import io.github.subhaneetshrestha.afnopadd.tools.color.RecentColorsStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -22,12 +22,14 @@ class RecentColorsStoreTest {
     private val dir = File(InstrumentationRegistry.getInstrumentation().targetContext.cacheDir, "recent-colors-${System.nanoTime()}")
 
     private fun <T> withStore(block: suspend (RecentColorsStore) -> T): T {
-        val scope = CoroutineScope(Dispatchers.IO + Job())
+        val job = Job()
+        val scope = CoroutineScope(Dispatchers.IO + job)
         try {
             val store = RecentColorsStore(PreferenceDataStoreFactory.create(scope = scope) { File(dir, "settings.preferences_pb") })
             return runBlocking { block(store) }
         } finally {
-            scope.cancel()
+            // Wait for the store to let go of the file; the next one would otherwise find it still active.
+            runBlocking { job.cancelAndJoin() }
         }
     }
 

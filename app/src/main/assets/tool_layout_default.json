@@ -3,22 +3,30 @@
   "source": "builtin",
   "toolbars": [
     {
-      "id": "main",
+      "id": "draw",
       "placement": "bottom",
       "items": [
+        { "ref": "tool:hand" },
+        { "separator": true },
         { "ref": "tool:pen" },
         { "ref": "tool:pencil" },
         { "ref": "tool:brush" },
         { "ref": "tool:highlighter" },
-        { "ref": "tool:eraser" },
-        { "separator": true },
+        { "ref": "tool:eraser" }
+      ]
+    },
+    {
+      "id": "shapes-and-actions",
+      "placement": "bottom",
+      "items": [
         { "ref": "tool:line" },
         { "ref": "tool:arrow" },
         { "ref": "tool:rect" },
         { "ref": "tool:ellipse" },
         { "separator": true },
         { "ref": "cmd:undo" },
-        { "ref": "cmd:redo" }
+        { "ref": "cmd:redo" },
+        { "ref": "widget:zoom" }
       ]
     }
   ]

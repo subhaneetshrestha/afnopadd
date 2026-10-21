@@ -3,6 +3,7 @@ package io.github.subhaneetshrestha.afnopadd.canvas
 import io.github.subhaneetshrestha.afnopadd.document.LocalPoint
 import io.github.subhaneetshrestha.afnopadd.document.WorldPoint
 import io.github.subhaneetshrestha.afnopadd.document.WorldRect
+import kotlin.math.min
 import kotlin.math.pow
 
 /**
@@ -37,6 +38,18 @@ object CanvasMath {
             translateX = (anchor.x - region.left) * scalePxPerUnit,
             translateY = (anchor.y - region.top) * scalePxPerUnit,
         )
+
+    /** The camera centred on [bounds] at the largest zoom that shows all of it inside the padded viewport. */
+    fun fitCamera(bounds: WorldRect, viewport: Viewport, paddingPx: Double): Camera {
+        val availableWidth = (viewport.widthPx - 2 * paddingPx).coerceAtLeast(1.0)
+        val availableHeight = (viewport.heightPx - 2 * paddingPx).coerceAtLeast(1.0)
+        val zoomForWidth = if (bounds.width > 0.0) availableWidth / bounds.width else Camera.MAX_ZOOM
+        val zoomForHeight = if (bounds.height > 0.0) availableHeight / bounds.height else Camera.MAX_ZOOM
+        return Camera(
+            center = WorldPoint((bounds.left + bounds.right) / 2.0, (bounds.top + bounds.bottom) / 2.0),
+            zoom = min(zoomForWidth, zoomForHeight).coerceIn(Camera.MIN_ZOOM, Camera.MAX_ZOOM),
+        )
+    }
 
     /** Linear in the centre, geometric in the zoom, so an animated zoom feels uniform. */
     fun interpolate(from: Camera, to: Camera, fraction: Double): Camera {

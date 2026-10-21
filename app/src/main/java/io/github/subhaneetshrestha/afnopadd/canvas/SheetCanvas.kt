@@ -60,6 +60,10 @@ fun SheetCanvas(
     secondPointerConstrains: Boolean = false,
 ) {
     val constrains by rememberUpdatedState(secondPointerConstrains)
+    // The gesture handler restarts when its role function changes, which would cut a stroke short;
+    // hand it one stable function that always asks the latest policy.
+    val currentRole by rememberUpdatedState(pointerRole)
+    val role = remember { { kind: PointerKind -> currentRole(kind) } }
     val snapshot by sheet.snapshot.collectAsState()
     val camera by cameraController.camera.collectAsState()
     var viewport by remember { mutableStateOf(Viewport(0, 0)) }
@@ -110,7 +114,7 @@ fun SheetCanvas(
                 canvasInWindow[0] = position.x
                 canvasInWindow[1] = position.y
             }
-            .canvasGestures(cameraController, router, pointerRole, { constrains }) { viewport },
+            .canvasGestures(cameraController, router, role, { constrains }) { viewport },
     ) {
         Spacer(
             modifier = Modifier.fillMaxSize().drawBehind {

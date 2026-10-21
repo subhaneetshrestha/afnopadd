@@ -14,6 +14,7 @@ object BuiltInTools {
     const val ARROW = "tool:arrow"
     const val RECTANGLE = "tool:rect"
     const val ELLIPSE = "tool:ellipse"
+    const val HAND = "tool:hand"
 }
 
 /** Parameter keys understood by the stroke tool. */

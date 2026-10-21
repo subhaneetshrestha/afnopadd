@@ -1,6 +1,16 @@
 package io.github.subhaneetshrestha.afnopadd.shell
 
+import android.os.SystemClock
+import android.view.InputDevice
+import android.view.MotionEvent
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.test.assertTextEquals
+import io.github.subhaneetshrestha.afnopadd.shell.settings.Settings
+import io.github.subhaneetshrestha.afnopadd.tools.ZoomReadoutTags
+import io.github.subhaneetshrestha.afnopadd.tools.commands.ZoomCommands
+import org.junit.After
+import org.junit.Assert.assertNotEquals
+import org.junit.Before
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -32,6 +42,49 @@ class EditorFlowTest {
     private val container get() = (context.applicationContext as AfnopaddApp).container
 
     private fun lastOpened(): SheetSummary? = runBlocking { container.library.lastOpened.first() }
+
+    /** Settings live in the app's real preferences file; every test starts and ends with the defaults (a finger draws). */
+    @Before
+    @After
+    fun resetSettings() {
+        runBlocking { container.settings.update { Settings() } }
+    }
+
+    private fun camera(sheet: SheetSummary) = container.editorSessions.get(sheet.id.value)!!.camera.camera.value
+
+    private fun newSheet(): SheetSummary {
+        composeRule.onNodeWithTag(LibraryTags.NEW_SHEET).performClick()
+        awaitCanvas()
+        composeRule.waitUntil(timeoutMillis = 5_000) { lastOpened() != null && container.editorSessions.get(lastOpened()!!.id.value) != null }
+        return lastOpened()!!
+    }
+
+    /** A stylus drag sent through the window, since Compose's test input only makes finger events. */
+    private fun stylusDrag(from: Offset, to: Offset) {
+        val origin = composeRule.onNodeWithTag(ShellTags.EDITOR_CANVAS).fetchSemanticsNode().positionOnScreen
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val downTime = SystemClock.uptimeMillis()
+        val properties = arrayOf(MotionEvent.PointerProperties().apply { id = 0; toolType = MotionEvent.TOOL_TYPE_STYLUS })
+        fun send(action: Int, at: Offset, time: Long) {
+            val coords = arrayOf(MotionEvent.PointerCoords().apply { x = origin.x + at.x; y = origin.y + at.y; pressure = 1f; size = 1f })
+            val event = MotionEvent.obtain(downTime, time, action, 1, properties, coords, 0, 0, 1f, 1f, 0, 0, InputDevice.SOURCE_STYLUS, 0)
+            instrumentation.sendPointerSync(event)
+            event.recycle()
+        }
+        send(MotionEvent.ACTION_DOWN, from, downTime)
+        for (i in 1..10) send(MotionEvent.ACTION_MOVE, from + (to - from) * (i / 10f), downTime + i * 16L)
+        send(MotionEvent.ACTION_UP, to, downTime + 176L)
+        composeRule.waitForIdle()
+    }
+
+    private fun fingerDrag() {
+        composeRule.onNodeWithTag(ShellTags.EDITOR_CANVAS).performTouchInput {
+            down(Offset(200f, 400f))
+            repeat(10) { moveBy(Offset(20f, 10f)) }
+            up()
+        }
+        composeRule.waitForIdle()
+    }
 
     private fun strokeCount(sheet: SheetSummary): Int = runBlocking { container.sheetStore.inspect(sheet.dir).elementCount }
 
@@ -245,6 +298,69 @@ class EditorFlowTest {
         } finally {
             runBlocking { opened.close() }
         }
+    }
+
+    @Test
+    fun theHandToolPansWithoutChangingTheSheet() {
+        val sheet = newSheet()
+        composeRule.onNodeWithTag(io.github.subhaneetshrestha.afnopadd.tools.ToolbarTags.item("tool:hand")).performScrollTo().performClick()
+        composeRule.waitForIdle()
+        val before = camera(sheet)
+
+        fingerDrag()
+        stylusDrag(Offset(200f, 300f), Offset(300f, 300f))
+
+        assertNotEquals(before.center, camera(sheet).center)
+        assertEquals(before.zoom, camera(sheet).zoom, 1e-9)
+        assertEquals(0, container.editorSessions.get(sheet.id.value)!!.sheet.snapshot.value.elements.size)
+        assertEquals(false, container.editorSessions.get(sheet.id.value)!!.sheet.canUndo.value)
+        leaveEditor()
+    }
+
+    @Test
+    fun theZoomReadoutZoomsInAndFitsTheContent() {
+        val sheet = createSheetAndDraw()
+        composeRule.onNodeWithTag(ZoomReadoutTags.READOUT).performScrollTo().assertTextEquals("100%").performClick()
+        composeRule.onNodeWithTag(ZoomReadoutTags.item(ZoomCommands.ZOOM_IN)).performClick()
+        // The step animates over 150 ms and ends exactly on 1.5x.
+        composeRule.waitUntil(timeoutMillis = 2_000) { camera(sheet).zoom == 1.5 }
+        composeRule.onNodeWithTag(ZoomReadoutTags.READOUT).assertTextEquals("150%")
+
+        composeRule.onNodeWithTag(ZoomReadoutTags.READOUT).performClick()
+        composeRule.onNodeWithTag(ZoomReadoutTags.item(ZoomCommands.ZOOM_FIT)).performClick()
+        // A 200 x 100 px stroke fills the canvas width minus the padding: well above 1.5x.
+        composeRule.waitUntil(timeoutMillis = 2_000) { camera(sheet).zoom > 2.0 }
+        leaveEditor()
+    }
+
+    /** Finger mode AUTO: a finger draws until a stylus touches the canvas; from then on a finger pans. */
+    @Test
+    fun aFingerDrawsUntilAStylusIsSeenThenPans() {
+        val sheet = newSheet()
+        fingerDrag()
+        composeRule.waitUntil(timeoutMillis = 10_000) { strokeCount(sheet) == 1 }
+
+        stylusDrag(Offset(200f, 600f), Offset(400f, 650f))
+        composeRule.waitUntil(timeoutMillis = 10_000) { strokeCount(sheet) == 2 }
+        composeRule.waitUntil(timeoutMillis = 5_000) { runBlocking { container.settings.settings.first() }.stylusSeen }
+        val before = camera(sheet)
+
+        fingerDrag()
+
+        assertNotEquals("a finger now pans", before.center, camera(sheet).center)
+        assertEquals("and draws nothing", 2, container.editorSessions.get(sheet.id.value)!!.sheet.snapshot.value.elements.size)
+        leaveEditor()
+    }
+
+    @Test
+    fun forcingFingerDrawingOverridesASeenStylus() {
+        runBlocking { container.settings.update { it.copy(stylusSeen = true, fingerMode = io.github.subhaneetshrestha.afnopadd.tools.FingerMode.DRAW) } }
+        val sheet = newSheet()
+
+        fingerDrag()
+
+        composeRule.waitUntil(timeoutMillis = 10_000) { strokeCount(sheet) == 1 }
+        leaveEditor()
     }
 
     @Test

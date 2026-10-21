@@ -2,9 +2,14 @@ package io.github.subhaneetshrestha.afnopadd.tools
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableDoubleStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextEquals
+import io.github.subhaneetshrestha.afnopadd.tools.commands.ZoomCommands
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
@@ -100,6 +105,44 @@ class ToolbarHostTest {
         val density = InstrumentationRegistry.getInstrumentation().targetContext.resources.displayMetrics.density
         assertTrue("toolbar is ${bounds.height / density} dp tall", bounds.height / density < 120f)
         rule.onNodeWithTag(ToolbarTags.item("tool:pen")).assertIsDisplayed()
+    }
+
+    @Test
+    fun widgetRefsRenderWhatTheHostSuppliesAndUnknownWidgetsVanish() {
+        val withWidgets = spec.copy(
+            toolbars = listOf(spec.toolbars.single().copy(items = listOf(ToolbarItem.Ref("widget:zoom"), ToolbarItem.Ref("widget:weather")))),
+        )
+        rule.setContent {
+            ToolbarHost(
+                spec = withWidgets, registry = registry, commands = commands, state = state,
+                widgets = mapOf("widget:zoom" to { Box(Modifier.testTag("zoom-widget")) }),
+            )
+        }
+
+        rule.onNodeWithTag("zoom-widget").assertExists()
+    }
+
+    @Test
+    fun theZoomReadoutShowsTheZoomAndRunsTheChosenCommand() {
+        var zoomedIn = 0
+        val zoomCommands = CommandRegistry().apply {
+            for (id in listOf(ZoomCommands.ZOOM_IN, ZoomCommands.ZOOM_OUT, ZoomCommands.ZOOM_FIT, ZoomCommands.ZOOM_100)) {
+                register(Command(id, R.string.command_zoom_in, R.drawable.ic_zoom_in, MutableStateFlow(true)) { if (id == ZoomCommands.ZOOM_IN) zoomedIn++ })
+            }
+        }
+        var zoom by mutableDoubleStateOf(1.5)
+        rule.setContent { ZoomReadout(zoom, zoomCommands) }
+
+        rule.onNodeWithTag(ZoomReadoutTags.READOUT).assertTextEquals("150%")
+        rule.runOnIdle { zoom = 25.0 }
+        rule.onNodeWithTag(ZoomReadoutTags.READOUT).assertTextEquals("25×")
+
+        rule.onNodeWithTag(ZoomReadoutTags.READOUT).performClick()
+        rule.onNodeWithTag(ZoomReadoutTags.item(ZoomCommands.ZOOM_IN)).performClick()
+        rule.waitForIdle()
+
+        assertEquals(1, zoomedIn)
+        rule.onNodeWithTag(ZoomReadoutTags.item(ZoomCommands.ZOOM_IN)).assertDoesNotExist()
     }
 
     @Test

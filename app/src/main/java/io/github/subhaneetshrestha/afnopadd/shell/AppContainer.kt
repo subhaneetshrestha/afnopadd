@@ -5,6 +5,8 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.preferencesDataStore
+import io.github.subhaneetshrestha.afnopadd.shell.settings.DataStoreSettingsRepository
+import io.github.subhaneetshrestha.afnopadd.shell.settings.SettingsRepository
 import io.github.subhaneetshrestha.afnopadd.tools.color.RecentColorsStore
 import io.github.subhaneetshrestha.afnopadd.R
 import io.github.subhaneetshrestha.afnopadd.canvas.Renderer
@@ -53,6 +55,8 @@ class AppContainer(val applicationContext: Context) {
 
     val recentColors: RecentColorsStore by lazy { RecentColorsStore(applicationContext.settingsDataStore) }
 
+    val settings: SettingsRepository by lazy { DataStoreSettingsRepository(applicationContext.settingsDataStore) }
+
     /** Open editor sessions, kept across activity recreation. */
     val editorSessions: EditorSessions = EditorSessions()
 
@@ -71,7 +75,7 @@ class AppContainer(val applicationContext: Context) {
 private const val TAG = "AppContainer"
 
 /**
- * The app's single preferences file (recent colours now; settings in Task 19). A corrupt file is
+ * The app's single preferences file (recent colours and settings). A corrupt file is
  * replaced with empty preferences instead of failing every read: losing recents and toggles is
  * recoverable, a settings file that crashes the editor on each open is not.
  */
