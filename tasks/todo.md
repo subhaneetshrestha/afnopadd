@@ -695,14 +695,16 @@ Done 2026-10-21.
 **Description:** Implement the raster tile cache: 256 px tiles keyed by bucket and tile coordinates, rendered on a background thread into hardware bitmaps, LRU budget of 10 percent of `memoryClass` (floor 48 MB, cap 128 MB), invalidation by dirty rectangles after each transaction, and the vector-versus-tile threshold (strokes thinner than 0.5 px or more than 2,000 visible elements). Release all tiles on `onTrimMemory`.
 
 **Acceptance criteria:**
-- [ ] On the API 29 phone, panning the 5,000-stroke fixture zoomed out stays at 60 fps with tiles and drops below without them (recorded numbers).
-- [ ] A transaction invalidates only the tiles overlapping its dirty rectangle (unit test on the tile index).
-- [ ] Tile memory never exceeds the budget; backgrounding releases tiles within one second.
+- [ ] On the API 29 phone, panning the 5,000-stroke fixture zoomed out stays at 60 fps with tiles and drops below without them (recorded numbers). Emulator (`TileLayerTest`, UI-thread cost of recording a frame): vectors median 119 ms, tiles median 0.97 ms (p95 2.7 ms). Phone pending (owner).
+- [x] A transaction invalidates only the tiles overlapping its dirty rectangle (`TileIndexTest` on the store; `TileLayerTest.aTransactionRedrawsOnlyTheTilesItTouched` on the fixture: one tile patched and redrawn, the rest kept).
+- [x] Tile memory never exceeds the budget; backgrounding releases tiles within one second (`TileIndexTest` eviction; `TileLayerTest`: a pan stays under a 150-tile budget, and stopping the activity drops all tiles at once).
 
 **Verification:**
-- [ ] Tests pass: `.\gradlew.bat testDebugUnitTest --tests "*.canvas.tiles.*"`; `connectedDebugAndroidTest` frame timing
-- [ ] Build succeeds: `.\gradlew.bat assembleDebug`
-- [ ] Manual check: zoomed-out pan on the API 29 phone
+- [x] Tests pass: `.\gradlew.bat testDebugUnitTest --tests "*.canvas.tiles.*"` (9); `TileLayerTest` (5, frame timing, invalidation, budget, background release, and tiles against a direct render: 0 of 401 inked 20 px cells differ). Mutation checks: no invalidation and no release on stop each fail a test. Full suite 147/147 on a cold `afnopadd36`.
+- [x] Build succeeds: `.\gradlew.bat assembleDebug`
+- [ ] Manual check: zoomed-out pan on the API 29 phone (owner)
+
+Notes: tiles are 256 px at the power-of-two level nearest the zoom (drawn at 0.71x to 1.41x), rendered on one background thread by `RegionPainter` (now shared with `SoftwareRenderer`) into a software bitmap and copied to a hardware one; empty tiles cost nothing. A tile that is missing, invalidated, or under an element a gesture is hiding (the eraser's preview) is drawn as vectors clipped to its square, so the view is always complete and current; at most 8 renders are queued, centre first, and renders a pan made pointless are skipped. Tiles are used above 2,000 visible elements or when most visible strokes are under 0.5 px. Images in tiles are decoded synchronously on the tile thread. Tiles are dropped on `ON_STOP` and on `onTrimMemory(UI_HIDDEN)` or above.
 
 **Dependencies:** Task 23
 
@@ -710,6 +712,8 @@ Done 2026-10-21.
 - `canvas/internal/tiles/TileCache.kt`, `canvas/internal/tiles/TileRasterizer.kt`, `canvas/internal/tiles/TileIndex.kt`, `canvas/internal/DryLayer.kt`
 
 **Estimated scope:** Medium
+
+Done 2026-10-21 (phone fps pending).
 
 ---
 

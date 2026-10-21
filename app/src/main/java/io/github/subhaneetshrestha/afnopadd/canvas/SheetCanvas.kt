@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -32,6 +34,15 @@ import androidx.compose.ui.viewinterop.AndroidView
 import io.github.subhaneetshrestha.afnopadd.canvas.internal.BackgroundPainter.drawBackground
 import io.github.subhaneetshrestha.afnopadd.canvas.internal.DryLayer
 import io.github.subhaneetshrestha.afnopadd.canvas.internal.ImagePainter
+import io.github.subhaneetshrestha.afnopadd.canvas.internal.tiles.TileGrid
+import io.github.subhaneetshrestha.afnopadd.canvas.internal.tiles.TileLayer
+import android.app.ActivityManager
+import android.content.ComponentCallbacks2
+import android.content.Context
+import android.content.res.Configuration
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import io.github.subhaneetshrestha.afnopadd.canvas.internal.InkHost
 import io.github.subhaneetshrestha.afnopadd.canvas.internal.WetStrokeRouter
 import io.github.subhaneetshrestha.afnopadd.canvas.internal.canvasGestures
@@ -97,6 +108,32 @@ fun SheetCanvas(
         )
     }
     DisposableEffect(dryLayer) { onDispose { dryLayer.release() } }
+    // The tile pyramid for crowded or zoomed-out views; dropped when the app goes to the background.
+    var tileTick by remember { mutableIntStateOf(0) }
+    val tiles = remember(sheet) {
+        val memoryClass = (context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager).memoryClass
+        TileLayer(TileGrid.budgetBytes(memoryClass), fileFor = { id -> runCatching { sheet.assets.file(id) }.getOrNull() }, onTileReady = { tileTick++ })
+    }
+    LocalTileLayerObserver.current?.let { observe -> SideEffect { observe(tiles) } }
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(tiles, lifecycle) {
+        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_STOP) tiles.trim() }
+        val trimmer = object : ComponentCallbacks2 {
+            override fun onTrimMemory(level: Int) {
+                if (level >= ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN) tiles.trim()
+            }
+            override fun onConfigurationChanged(newConfig: Configuration) = Unit
+            @Deprecated("Superseded by onTrimMemory")
+            override fun onLowMemory() = tiles.trim()
+        }
+        lifecycle.addObserver(observer)
+        context.applicationContext.registerComponentCallbacks(trimmer)
+        onDispose {
+            lifecycle.removeObserver(observer)
+            context.applicationContext.unregisterComponentCallbacks(trimmer)
+            tiles.release()
+        }
+    }
     // One router for the canvas's lifetime; it reads the current tool when each gesture starts, so a
     // tool switch never strands a stroke that the previous tool started.
     val currentSink by rememberUpdatedState(inputSink)
@@ -149,10 +186,18 @@ fun SheetCanvas(
                 releaseTick // read so a lifted stroke redraws the dry layer even if nothing else changed
                 @Suppress("UNUSED_EXPRESSION")
                 imageTick // read so a bitmap that has just arrived is drawn
+                @Suppress("UNUSED_EXPRESSION")
+                tileTick // and a tile
                 drawBackground(background, camera, viewport)
                 drawIntoCanvas { composeCanvas ->
-                    val visible = index.visible(snapshot, visibleRect(camera, viewport))
-                    dryLayer.draw(composeCanvas.nativeCanvas, visible, hiddenElements, camera, viewport)
+                    val visibleRect = visibleRect(camera, viewport)
+                    val visible = index.visible(snapshot, visibleRect)
+                    tiles.sync(snapshot)
+                    if (tiles.shouldTile(visible, camera)) {
+                        tiles.draw(composeCanvas.nativeCanvas, snapshot, visible, hiddenElements, camera, viewport, visibleRect, dryLayer)
+                    } else {
+                        dryLayer.draw(composeCanvas.nativeCanvas, visible, hiddenElements, camera, viewport)
+                    }
                     // A tool's live preview (a shape being dragged) draws exactly like the element it will become.
                     if (previewElements.isNotEmpty()) dryLayer.draw(composeCanvas.nativeCanvas, previewElements, emptySet(), camera, viewport)
                 }
@@ -228,6 +273,9 @@ private fun DrawScope.drawCropFrame(corners: List<WorldPoint>, camera: Camera, v
         drawCircle(SELECTION_COLOR, radius, corner, style = Stroke(width = 2.dp.toPx()))
     }
 }
+
+/** Lets instrumented tests see a canvas's tile layer (how many tiles it holds or had to patch). */
+internal val LocalTileLayerObserver = staticCompositionLocalOf<((TileLayer) -> Unit)?> { null }
 
 private val SELECTION_COLOR = Color(0xFF1E6FD9)
 

@@ -5,15 +5,9 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import androidx.core.graphics.createBitmap
-import androidx.core.graphics.withMatrix
-import androidx.ink.rendering.android.canvas.CanvasStrokeRenderer
 import io.github.subhaneetshrestha.afnopadd.canvas.internal.BackgroundPainter
-import io.github.subhaneetshrestha.afnopadd.canvas.internal.InkBridge.toAndroidMatrix
-import io.github.subhaneetshrestha.afnopadd.canvas.internal.ShapePainter
-import io.github.subhaneetshrestha.afnopadd.document.ShapeElement
-import io.github.subhaneetshrestha.afnopadd.canvas.internal.StrokeCache
+import io.github.subhaneetshrestha.afnopadd.canvas.internal.RegionPainter
 import io.github.subhaneetshrestha.afnopadd.document.ElementSnapshot
-import io.github.subhaneetshrestha.afnopadd.document.StrokeElement
 import io.github.subhaneetshrestha.afnopadd.document.WorldRect
 import kotlin.math.floor
 import kotlin.math.min
@@ -28,14 +22,7 @@ import kotlin.math.min
 class SoftwareRenderer(private val maxBitmapPixels: Long = DEFAULT_MAX_BITMAP_PIXELS) : Renderer {
 
     private val lock = Any()
-    private val strokeRenderer = CanvasStrokeRenderer.create()
-    private val strokeCache = StrokeCache(maxBytes = 16L * 1024 * 1024)
-    private val shapePainter = ShapePainter()
-    private val outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        color = 0xFF9E9E9E.toInt()
-        strokeWidth = 1f
-    }
+    private val painter = RegionPainter()
     private val linePaint = Paint().apply { color = 0xFFD0D0D0.toInt(); strokeWidth = 1f }
 
     override fun renderBitmap(snapshot: ElementSnapshot, bounds: WorldRect, scalePxPerUnit: Double, background: Background): Bitmap {
@@ -53,7 +40,7 @@ class SoftwareRenderer(private val maxBitmapPixels: Long = DEFAULT_MAX_BITMAP_PI
             try {
                 renderRegion(canvas, snapshot, bounds, scalePxPerUnit, background)
             } finally {
-                strokeCache.clear()
+                painter.clear()
             }
         }
     }
@@ -61,28 +48,7 @@ class SoftwareRenderer(private val maxBitmapPixels: Long = DEFAULT_MAX_BITMAP_PI
     private fun renderRegion(canvas: Canvas, snapshot: ElementSnapshot, bounds: WorldRect, scalePxPerUnit: Double, background: Background) {
         val size = RenderGeometry.pixelSize(bounds, scalePxPerUnit)
         drawBackground(canvas, background, bounds, scalePxPerUnit, size)
-        for (element in snapshot.ordered) {
-            if (element.bounds.right < bounds.left || element.bounds.left > bounds.right ||
-                element.bounds.bottom < bounds.top || element.bounds.top > bounds.bottom
-            ) {
-                continue
-            }
-            if (element is StrokeElement) {
-                val matrix = CanvasMath.frameToRegion(bounds, scalePxPerUnit, element.anchor, element.frameLevel).toAndroidMatrix()
-                val stroke = strokeCache.strokeFor(element)
-                canvas.withMatrix(matrix) { strokeRenderer.draw(this, stroke, matrix) }
-            } else if (element is ShapeElement) {
-                shapePainter.draw(canvas, element, CanvasMath.frameToRegion(bounds, scalePxPerUnit, element.anchor, element.frameLevel))
-            } else {
-                canvas.drawRect(
-                    ((element.bounds.left - bounds.left) * scalePxPerUnit).toFloat(),
-                    ((element.bounds.top - bounds.top) * scalePxPerUnit).toFloat(),
-                    ((element.bounds.right - bounds.left) * scalePxPerUnit).toFloat(),
-                    ((element.bounds.bottom - bounds.top) * scalePxPerUnit).toFloat(),
-                    outlinePaint,
-                )
-            }
-        }
+        painter.draw(canvas, snapshot.ordered, bounds, scalePxPerUnit)
     }
 
     override fun renderTiled(
@@ -98,7 +64,7 @@ class SoftwareRenderer(private val maxBitmapPixels: Long = DEFAULT_MAX_BITMAP_PI
             try {
                 renderTiles(snapshot, bounds, scalePxPerUnit, background, tileSizePx, onTile)
             } finally {
-                strokeCache.clear()
+                painter.clear()
             }
         }
     }

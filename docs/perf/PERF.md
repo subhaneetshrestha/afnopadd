@@ -89,11 +89,18 @@ stayed flat within these loops, so that growth is the emulator's, not the app's.
 
 - **Overview of a full sheet is still 120+ ms per frame.** 5,000 path draws per frame is too many for
   60 fps; the tile pyramid (Task 24, spec decision 5) is the fix and must cover this fixture.
+  Fixed 2026-10-21, see below.
 - **Per-commit cost grows with the sheet:** each transaction copies the element map (median 2.5 ms
   at 5,000 strokes) and the next draw re-sorts z-order (0.6 ms). Persistent collections would fix
   the copy but are a third-party dependency (ask the owner first); tracked for Task 25.
 - No editor-level leak check yet (sheet released after leaving the editor); LeakCanary would do it
   but is a new dependency.
+
+## 2026-10-21: tile pyramid (Task 24)
+
+| Idea | Baseline → result | Verdict | Why |
+|---|---|---|---|
+| Draw crowded or hairline views from 256 px tiles of the nearest power-of-two level, rendered in the background into hardware bitmaps; missing or invalidated tiles drawn as clipped vectors | overview of 5,000 strokes 119 ms → 0.97 ms median (2.7 ms p95) | kept | Closes the "overview is 120 ms" gap above. First frame after a jump still costs the vector draw for the tiles not yet rendered; tiles fill in centre first. Tiles match a direct render (0 of 401 inked cells differ in `TileLayerTest`). |
 
 ### Guards
 

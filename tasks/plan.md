@@ -73,7 +73,7 @@ T1 build plumbing ─┬─ T2 app shell skeleton ──────────
 - [x] Task 21: Select tool: scale and rotate handles
 - [x] Task 22: Image import pipeline
 - [x] Task 23: Image rendering, crop mode, arrange in row
-- [ ] Task 24: Tile pyramid cache and level of detail
+- [x] Task 24: Tile pyramid cache and level of detail
 - [ ] Task 25: Deep-zoom hardening and performance fixture
 
 ### Checkpoint D: Performance criteria
