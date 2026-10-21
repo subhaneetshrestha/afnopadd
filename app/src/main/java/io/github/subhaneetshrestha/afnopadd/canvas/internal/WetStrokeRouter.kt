@@ -1,5 +1,6 @@
 package io.github.subhaneetshrestha.afnopadd.canvas.internal
 
+import androidx.compose.ui.geometry.Offset
 import androidx.ink.authoring.InProgressStrokeId
 import androidx.ink.authoring.InProgressStrokesView
 import androidx.ink.strokes.MutableStrokeInputBatch
@@ -26,10 +27,10 @@ import io.github.subhaneetshrestha.afnopadd.document.StrokePoints
  * Ink only ever draws the stroke while the pen is down. At pen-up the stroke goes to the tool,
  * built from the samples recorded here, and is committed at once; the dry layer draws it in the
  * next frame and Ink's copy is then cancelled ([releaseAfterDraw]), so the stroke never blinks.
- * Ink is never asked to finish a stroke and hand it over, because Ink 1.0.0 crashes its render
- * thread when its view goes away while it holds a finished stroke (about 400 ms after each one;
- * the Task 16b crash, ADR 0003), and so that leaving the editor or rotating right after lifting the
- * pen can neither crash nor lose the stroke.
+ * Ink is never asked to finish a stroke and hand it over, so that leaving the editor or rotating
+ * right after lifting the pen cannot lose the stroke. (Ink 1.0.0 also crashes when its view is
+ * detached within about half a second of drawing, which is why the view itself is never detached
+ * while its activity lives; see InkHost and ADR 0003.)
  *
  * One router lives as long as its canvas; [downstream] is read when a gesture starts, and that
  * gesture's events and its finished stroke go to that sink.
@@ -40,6 +41,8 @@ internal class WetStrokeRouter(
     private val viewport: () -> Viewport,
     private val wetStrokeBrush: (StrokeFrame) -> BrushSpec?,
     private val onReleasePending: () -> Unit = {},
+    /** Where the canvas's origin is in [view]'s pixels; the hosted view covers the whole window (InkHost). */
+    private val canvasOffsetInView: (InProgressStrokesView) -> Offset = { Offset.Zero },
 ) : CanvasInputSink {
 
     private class ActiveStroke(
@@ -136,7 +139,10 @@ internal class WetStrokeRouter(
             id = inkView.startStroke(
                 InkBridge.strokeInput(x = 0f, y = 0f, elapsedMillis = 0L, kind = event.kind, pressure = pressure),
                 InkBridge.toInkBrush(brush),
-                frame.transform.toAndroidMatrix(),
+                frame.transform.toAndroidMatrix().apply {
+                    val offset = canvasOffsetInView(inkView)
+                    postTranslate(offset.x, offset.y)
+                },
             ),
             frame = frame,
             brush = brush,

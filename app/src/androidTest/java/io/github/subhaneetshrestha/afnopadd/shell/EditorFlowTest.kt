@@ -194,9 +194,8 @@ class EditorFlowTest {
     }
 
     /**
-     * The stroke is in the sheet the moment the pen lifts, so leaving straight away cannot lose it.
-     * (Leaving within about half a second of drawing can still crash Ink 1.0.0 itself, ADR 0003, so
-     * the test leaves only after Ink has settled.)
+     * The stroke is in the sheet the moment the pen lifts, so leaving straight away cannot lose it,
+     * and leaving straight away no longer crashes Ink 1.0.0 (its view stays attached, ADR 0003).
      */
     @Test
     fun aStrokeIsInTheSheetAsSoonAsThePenLifts() {
@@ -214,7 +213,6 @@ class EditorFlowTest {
         composeRule.runOnIdle {
             assertEquals(1, container.editorSessions.get(sheet.id.value)!!.sheet.snapshot.value.elements.size)
         }
-        Thread.sleep(1_000)
         leaveEditor()
 
         composeRule.waitUntil(timeoutMillis = 10_000) { strokeCount(sheet) == 1 }

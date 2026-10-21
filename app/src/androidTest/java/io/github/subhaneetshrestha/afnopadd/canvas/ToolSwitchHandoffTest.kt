@@ -94,9 +94,8 @@ class ToolSwitchHandoffTest {
 
     /**
      * The tool gets the stroke at pen-up, from the router's own samples, so nothing depends on Ink
-     * handing it over: leaving the editor or rotating right after lifting cannot lose it, even
-     * though removing Ink's view within about half a second of drawing still crashes Ink 1.0.0
-     * itself (ADR 0003). The canvas is removed only after Ink has settled, to test this app, not Ink.
+     * handing it over: leaving the editor or rotating right after lifting cannot lose it. The
+     * canvas goes straight after the stroke (InkHostTest covers that this no longer crashes Ink).
      */
     @Test
     fun aLiftedStrokeReachesTheToolAtPenUpAndOnlyOnce() {
@@ -109,9 +108,9 @@ class ToolSwitchHandoffTest {
             up()
         }
         rule.runOnIdle { assertEquals("the stroke did not reach the tool at pen-up", 1, pen.finished.size) }
-        Thread.sleep(1_000)
         rule.runOnIdle { showing = false }
         rule.waitForIdle()
+        Thread.sleep(1_000) // long enough for Ink to have handed a finished stroke over, had it been asked to
 
         assertEquals("the stroke was delivered twice", 1, pen.finished.size)
     }

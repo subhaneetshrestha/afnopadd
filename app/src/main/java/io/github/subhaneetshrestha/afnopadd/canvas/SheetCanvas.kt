@@ -14,13 +14,17 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import io.github.subhaneetshrestha.afnopadd.canvas.internal.BackgroundPainter.drawBackground
 import io.github.subhaneetshrestha.afnopadd.canvas.internal.DryLayer
-import io.github.subhaneetshrestha.afnopadd.canvas.internal.SharedInkView
+import io.github.subhaneetshrestha.afnopadd.canvas.internal.InkHost
 import io.github.subhaneetshrestha.afnopadd.canvas.internal.WetStrokeRouter
 import io.github.subhaneetshrestha.afnopadd.canvas.internal.canvasGestures
 import io.github.subhaneetshrestha.afnopadd.document.BrushSpec
@@ -65,17 +69,46 @@ fun SheetCanvas(
     // tool switch never strands a stroke that the previous tool started.
     val currentSink by rememberUpdatedState(inputSink)
     val currentBrush by rememberUpdatedState(wetStrokeBrush)
+    // Where this canvas sits in its window, so strokes on the window-sized hosted Ink view line up.
+    val canvasInWindow = remember { FloatArray(2) }
     val router = remember(cameraController) {
-        WetStrokeRouter({ currentSink }, cameraController, { viewport }, { frame -> currentBrush(frame) }, onReleasePending = { releaseTick++ })
+        WetStrokeRouter(
+            { currentSink }, cameraController, { viewport }, { frame -> currentBrush(frame) },
+            onReleasePending = { releaseTick++ },
+            canvasOffsetInView = { view ->
+                val location = IntArray(2).also(view::getLocationInWindow)
+                Offset(canvasInWindow[0] - location[0], canvasInWindow[1] - location[1])
+            },
+        )
     }
     // A replaced router must drop its Ink view, or the view keeps it and its tools alive.
     DisposableEffect(router) { onDispose { router.view = null } }
+    // Jetpack Ink's low-latency wet-stroke layer, borrowed from the activity: it stays attached when
+    // the canvas goes, because detaching it right after a stroke crashes Ink 1.0.0 (ADR 0003). It
+    // never handles touch itself; the gesture handler feeds it through the router.
+    val context = LocalContext.current
+    var privateInk by remember { mutableStateOf(false) }
+    DisposableEffect(router, context) {
+        val hosted = InkHost.acquire(context)
+        if (hosted != null) router.view = hosted else privateInk = true
+        onDispose {
+            if (hosted != null) {
+                router.view = null
+                InkHost.release(hosted)
+            }
+        }
+    }
 
     Box(
         modifier = modifier
             .onSizeChanged { size ->
                 viewport = Viewport(size.width, size.height)
                 onViewportChanged(viewport)
+            }
+            .onGloballyPositioned { coordinates ->
+                val position = coordinates.positionInWindow()
+                canvasInWindow[0] = position.x
+                canvasInWindow[1] = position.y
             }
             .canvasGestures(cameraController, router, pointerRole, { constrains }) { viewport },
     ) {
@@ -94,17 +127,18 @@ fun SheetCanvas(
                 router.releaseAfterDraw()
             },
         )
-        // Jetpack Ink's low-latency wet-stroke layer. It never handles touch itself; the gesture
-        // handler above feeds it through the router so pinch and finger policy stay ours.
-        AndroidView(
-            factory = { context -> SharedInkView.obtain(context) },
-            modifier = Modifier.fillMaxSize(),
-            update = { view -> router.view = view },
-            onRelease = { view ->
-                router.view = null
-                SharedInkView.release(view)
-            },
-        )
+        // Without an activity to host it, or with a second canvas on screen, this canvas gets its own view.
+        if (privateInk) {
+            AndroidView(
+                factory = InkHost::create,
+                modifier = Modifier.fillMaxSize(),
+                update = { view -> router.view = view },
+                onRelease = { view ->
+                    router.view = null
+                    InkHost.release(view)
+                },
+            )
+        }
     }
 }
 

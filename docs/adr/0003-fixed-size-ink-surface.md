@@ -1,4 +1,4 @@
-# ADR 0003: Keep Ink's wet-stroke surface at a fixed size, and reuse it
+# ADR 0003: Keep Ink's wet-stroke surface at a fixed size, reuse it, and never detach it
 
 Date: 2026-10-20. Status: accepted (Task 16b).
 
@@ -41,8 +41,8 @@ editor and in other tests were the same race; an overloaded host made it far mor
   changes.
 - A second Ink 1.0.0 defect surfaced in the same investigation: `CanvasInProgressStrokesRenderHelperV33`
   starts a `HandlerThread` per `InProgressStrokesView` and never quits it. The canvas therefore
-  takes its Ink view from `SharedInkView` (one per activity, reused across editor visits, dropped
-  on `ON_DESTROY`) instead of creating one per visit; `InkThreadLeakTest` guards it.
+  takes its Ink view from the activity (at first `SharedInkView`, now `InkHost`, below) instead of
+  creating one per visit; `InkThreadLeakTest` guards it.
 - Update 2026-10-21: the remaining crash has a reliable recipe. Removing the canvas (and with it
   Ink's view) within about half a second of drawing a stroke crashes Ink 1.0.0, either as
   `IllegalStateException: Unbalanced saves and restores` in
@@ -55,8 +55,21 @@ editor and in other tests were the same race; an overloaded host made it far mor
   - Tried and rejected: `requestHandoff()` and `handoffDebounceTimeMs` (both `@RestrictTo` the Ink
     library, and measured to make no difference to the hand-over delay); `flush()` (asynchronous,
     and blocked `onStop` until the activity hung in PAUSED).
-  - Next candidate: keep the Ink view attached for the activity's whole life (hosted at the
-    activity level and shown under the editor), so leaving the editor never detaches it; confirm on
-    a real device first.
+- Update 2026-10-21, fix: `InkHost` attaches one `InProgressStrokesView` per activity on top of
+  the activity's content (`addContentView`, window-sized, transparent, not clickable, hidden from
+  accessibility) and never detaches it while the activity lives. A `SheetCanvas` borrows it and,
+  when it leaves, only cancels and removes its strokes. Because the view covers the window, the
+  router offsets each stroke's transform by the canvas's position relative to the view. A canvas
+  with no activity, or a second canvas on screen at once, falls back to a view of its own.
+  - Evidence: `InkHostTest.removingTheCanvasRightAfterAStrokeDoesNotCrash` (six strokes, each
+    followed at once by removing the canvas) crashed with the old code (`Unbalanced saves and
+    restores`) and passes with the fix; putting the detach back brings back the libhwui SIGSEGV
+    (`0x63e8`). `wetInkIsDrawnUnderTheFinger` checks alignment on a real screenshot with touches
+    sent through the window, so the overlay must let them through. `EditorFlowTest` now leaves the
+    editor straight after drawing.
+  - Still exposed: rotating within about half a second of drawing destroys the activity's window,
+    and the Ink view with it; the stroke is safe, the crash is not ruled out. A wet stroke dragged
+    over the toolbars draws over them until the pen lifts. Each activity recreation still costs Ink
+    one thread. Confirm on a real device.
 - The race and the thread leak should be reported upstream to the Jetpack Ink issue tracker with the bare-resize repro
   (owner's call: it is an outward-facing action).
