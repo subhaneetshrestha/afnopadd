@@ -24,6 +24,7 @@ import io.github.subhaneetshrestha.afnopadd.document.internal.json.ElementJsonCo
 import android.database.SQLException
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import androidx.sqlite.driver.bundled.SQLITE_OPEN_READONLY
+import androidx.sqlite.execSQL
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -182,6 +183,9 @@ internal class RoomSheetStore(
         val userVersion = try {
             val connection = BundledSQLiteDriver().open(file.absolutePath, SQLITE_OPEN_READONLY)
             try {
+                // Wait out a sheet that is briefly locked, as one being closed is while it compacts
+                // and checkpoints; Room's own connections wait the same way.
+                connection.execSQL("PRAGMA busy_timeout = $BUSY_TIMEOUT_MILLIS")
                 connection.prepare("PRAGMA user_version").use { statement -> statement.step(); statement.getLong(0) }
             } finally {
                 connection.close()
@@ -258,6 +262,8 @@ internal class RoomSheetStore(
     internal companion object {
         const val ASSETS_DIRECTORY = "assets"
         private val SQLITE_HEADER = "SQLite format 3\u0000".toByteArray(Charsets.US_ASCII)
+        /** Room's default busy timeout. */
+        private const val BUSY_TIMEOUT_MILLIS = 3_000
         const val OPS_TO_KEEP = 1_000
         const val DECODE_CHUNK_SIZE = 256
         const val META_SCHEMA_VERSION = "schema_version"
