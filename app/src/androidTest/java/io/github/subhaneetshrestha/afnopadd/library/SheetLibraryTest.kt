@@ -91,24 +91,75 @@ class SheetLibraryTest {
     }
 
     @Test
+    fun reconcileLeavesASheetInPlaceWhenReadingItFailsForATransientReason(): Unit = runBlocking {
+        val healthy = library().createSheet("Healthy")
+        database.libraryDao().delete(healthy.id.value) // the index lost it, so reconcile must re-read it
+        val diskFull = object : io.github.subhaneetshrestha.afnopadd.document.SheetStore by store {
+            override suspend fun inspect(dir: File) = throw android.database.SQLException("Error code: 13, message: database or disk is full")
+        }
+        val library = RoomSheetLibrary(store = diskFull, database = database, root = File(base, "sheets"), trash = File(base, "trash"), clock = { now++ })
+
+        library.reconcile()
+
+        assertTrue("a healthy sheet was moved out of the library", healthy.dir.isDirectory)
+        assertFalse(File(base, "quarantine/${healthy.id.value}").exists())
+        // Once the disk is fine again, the next reconcile finds it.
+        library().reconcile()
+        assertEquals(listOf(healthy.id), library().sheets.first().map { it.id })
+    }
+
+    @Test
+    fun reconcileDeletesAnInterruptedDuplicateWithoutRegisteringIt(): Unit = runBlocking {
+        val library = library()
+        val original = library.createSheet("Original")
+        val staging = File(base, "sheets/01JAX9Q8K0TZ3M4N5P6R7S8T9V${io.github.subhaneetshrestha.afnopadd.document.SheetStore.STAGING_SUFFIX}")
+        original.dir.copyRecursively(staging) // a complete, valid copy that was never renamed into place
+
+        library().reconcile()
+
+        assertFalse("the staging directory was left behind", staging.exists())
+        assertEquals(listOf(original.id), library.sheets.first().map { it.id })
+    }
+
+    @Test
+    fun aDuplicateThatFailsLeavesNoCopyAndNoStagingDirectory(): Unit = runBlocking {
+        val library = library()
+        val source = library.createSheet("Broken inside")
+        // Valid header and version, but no meta table: the copy fails once Room reads it.
+        androidx.sqlite.driver.bundled.BundledSQLiteDriver().open(File(source.dir, "sheet.db").absolutePath).apply {
+            prepare("DROP TABLE meta").use { it.step() }
+            close()
+        }
+        val before = File(base, "sheets").list().orEmpty().toSet()
+
+        assertThrows(io.github.subhaneetshrestha.afnopadd.document.SheetFormatException::class.java) {
+            runBlocking { library.duplicate(source.id) }
+        }
+
+        assertEquals("the failed duplicate left files behind", before, File(base, "sheets").list().orEmpty().toSet())
+    }
+
+    @Test
     fun aDeleteWaitsForTheEditorToFinishClosingTheSheet(): Unit = runBlocking {
         val library = library()
         val sheet = library.createSheet("Closing")
+        val closeHoldsTheLock = kotlinx.coroutines.CompletableDeferred<Unit>()
         val closeMayFinish = kotlinx.coroutines.CompletableDeferred<Unit>()
         var thumbnailWritten = false
 
         val closing = launch(Dispatchers.IO) {
             library.closeEditing(sheet.id) { dir ->
+                closeHoldsTheLock.complete(Unit)
                 closeMayFinish.await()
                 // The editor still writes into the sheet's directory here.
                 File(dir, SheetLibrary.THUMBNAIL_FILE_NAME).writeBytes(byteArrayOf(1, 2, 3))
                 thumbnailWritten = true
             }
         }
-        while (!closing.isActive) kotlinx.coroutines.delay(5)
-        kotlinx.coroutines.delay(100)
+        closeHoldsTheLock.await()
         val deleting = launch(Dispatchers.IO) { library.delete(sheet.id) }
-        kotlinx.coroutines.delay(200)
+        // Give the delete every chance to run; it must still be waiting for the lock.
+        kotlinx.coroutines.delay(300)
         assertTrue("the delete ran while the editor was still closing", sheet.dir.isDirectory && !deleting.isCompleted)
 
         closeMayFinish.complete(Unit)

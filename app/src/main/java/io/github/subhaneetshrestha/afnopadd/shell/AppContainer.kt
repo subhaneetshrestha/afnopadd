@@ -35,7 +35,11 @@ class AppContainer(val applicationContext: Context) {
      * no screen left to report to, and each job that matters reports through its own state.
      */
     val appScope: CoroutineScope = CoroutineScope(
-        SupervisorJob() + Dispatchers.Main.immediate + CoroutineExceptionHandler { _, e -> Log.e(TAG, "Background work failed", e) },
+        SupervisorJob() + Dispatchers.Main.immediate + CoroutineExceptionHandler { _, e ->
+            // Errors (out of memory, stack overflow) leave the process in an unknown state; let them crash.
+            if (e !is Exception) throw e
+            Log.e(TAG, "Background work failed", e)
+        },
     )
 
     val sheetStore: SheetStore by lazy { RoomSheetStore(applicationContext) }

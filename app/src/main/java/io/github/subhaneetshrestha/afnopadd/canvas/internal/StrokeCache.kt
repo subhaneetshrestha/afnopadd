@@ -56,8 +56,10 @@ internal class StrokeCache(private val maxBytes: Long = DEFAULT_MAX_BYTES) {
             entries.remove(element.id)
             estimatedBytes -= it.bytes
         }
+        // A stroke larger than the whole budget is drawn but never kept, and costs no other entry.
+        if (bytes > maxBytes) return stroke
         evict(toFit = bytes)
-        if (estimatedBytes + bytes <= maxBytes || entries.isEmpty()) {
+        if (estimatedBytes + bytes <= maxBytes) {
             entries[element.id] = Entry(element.points, element.brush, stroke, bytes, frame)
             estimatedBytes += bytes
         }
@@ -74,7 +76,8 @@ internal class StrokeCache(private val maxBytes: Long = DEFAULT_MAX_BYTES) {
         val iterator = entries.entries.iterator()
         while (estimatedBytes + toFit > maxBytes && iterator.hasNext()) {
             val eldest = iterator.next()
-            if (frame > 0 && eldest.value.frame == frame) continue
+            // Access order puts everything drawn this frame after this entry too: nothing left to evict.
+            if (frame > 0 && eldest.value.frame == frame) break
             iterator.remove()
             estimatedBytes -= eldest.value.bytes
         }

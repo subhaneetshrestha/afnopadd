@@ -52,10 +52,12 @@ class ToolSwitchHandoffTest {
     private val sheet = SheetImpl(SheetMeta(SheetId("01JAX9Q8K0TZ3M4N5P6R7S8T9V"), "Switch", 0L, 0L), emptyList(), writer = {})
     private val camera = CameraController()
 
+    private var showing by mutableStateOf(true)
+
     private fun showCanvas() {
         rule.setContent {
             val density = LocalDensity.current
-            Box(Modifier.size(with(density) { 600.toDp() }, with(density) { 400.toDp() })) {
+            if (showing) Box(Modifier.size(with(density) { 600.toDp() }, with(density) { 400.toDp() })) {
                 SheetCanvas(
                     sheet, camera, sink, Modifier.fillMaxSize().testTag(CANVAS_TAG),
                     wetStrokeBrush = { BrushSpec("ink:pressure-pen", 4f, 0xFF000000, 1f, 0.025f) },
@@ -88,6 +90,30 @@ class ToolSwitchHandoffTest {
 
         assertEquals(1, pen.finished.size)
         assertTrue(other.finished.isEmpty())
+    }
+
+    /**
+     * The tool gets the stroke at pen-up, from the router's own samples, so nothing depends on Ink
+     * handing it over: leaving the editor or rotating right after lifting cannot lose it, even
+     * though removing Ink's view within about half a second of drawing still crashes Ink 1.0.0
+     * itself (ADR 0003). The canvas is removed only after Ink has settled, to test this app, not Ink.
+     */
+    @Test
+    fun aLiftedStrokeReachesTheToolAtPenUpAndOnlyOnce() {
+        showCanvas()
+
+        rule.onNodeWithTag(CANVAS_TAG).performTouchInput {
+            down(Offset(100f, 100f))
+            moveTo(Offset(200f, 150f))
+            moveTo(Offset(200f, 150f)) // a repeated sample, as a real pen-up often sends
+            up()
+        }
+        rule.runOnIdle { assertEquals("the stroke did not reach the tool at pen-up", 1, pen.finished.size) }
+        Thread.sleep(1_000)
+        rule.runOnIdle { showing = false }
+        rule.waitForIdle()
+
+        assertEquals("the stroke was delivered twice", 1, pen.finished.size)
     }
 
     @Test

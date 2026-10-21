@@ -1,10 +1,9 @@
 package io.github.subhaneetshrestha.afnopadd.canvas.internal
 
 import androidx.ink.authoring.InProgressStrokeId
-import androidx.ink.authoring.InProgressStrokesFinishedListener
 import androidx.ink.authoring.InProgressStrokesView
 import androidx.ink.strokes.MutableStrokeInputBatch
-import androidx.ink.strokes.Stroke
+import androidx.ink.strokes.StrokeInput
 import io.github.subhaneetshrestha.afnopadd.canvas.CameraController
 import io.github.subhaneetshrestha.afnopadd.canvas.CanvasInputSink
 import io.github.subhaneetshrestha.afnopadd.canvas.CanvasMath
@@ -17,27 +16,31 @@ import io.github.subhaneetshrestha.afnopadd.canvas.StrokeFrame
 import io.github.subhaneetshrestha.afnopadd.canvas.Viewport
 import io.github.subhaneetshrestha.afnopadd.canvas.internal.InkBridge.toAndroidMatrix
 import io.github.subhaneetshrestha.afnopadd.document.BrushSpec
+import io.github.subhaneetshrestha.afnopadd.document.StrokePoints
 
 /**
  * Sits between the gesture handler and the tool. Every pointer event is forwarded downstream; the
- * ones that start, extend, finish or cancel a stroke also drive Jetpack Ink's [InProgressStrokesView]
+ * ones that start, extend or cancel a stroke also drive Jetpack Ink's [InProgressStrokesView]
  * through its `StrokeInput` API, in the zoom frame fixed at the stroke's first sample.
  *
- * Finished Ink strokes come back as [FinishedStroke]s. Ink keeps drawing its own copy until the
- * canvas has drawn the committed element once, then [drainHandoff] releases them, so the stroke
- * never blinks between the wet and dry layers.
+ * Ink only ever draws the stroke while the pen is down. At pen-up the stroke goes to the tool,
+ * built from the samples recorded here, and is committed at once; the dry layer draws it in the
+ * next frame and Ink's copy is then cancelled ([releaseAfterDraw]), so the stroke never blinks.
+ * Ink is never asked to finish a stroke and hand it over, because Ink 1.0.0 crashes its render
+ * thread when its view goes away while it holds a finished stroke (about 400 ms after each one;
+ * the Task 16b crash, ADR 0003), and so that leaving the editor or rotating right after lifting the
+ * pen can neither crash nor lose the stroke.
  *
  * One router lives as long as its canvas; [downstream] is read when a gesture starts, and that
- * gesture's events and its finished stroke go to that sink. Switching tools mid-stroke, or between
- * lifting the pen and Ink finishing the stroke, therefore cannot lose the stroke.
+ * gesture's events and its finished stroke go to that sink.
  */
 internal class WetStrokeRouter(
     private val downstream: () -> CanvasInputSink,
     private val cameraController: CameraController,
     private val viewport: () -> Viewport,
     private val wetStrokeBrush: (StrokeFrame) -> BrushSpec?,
-    private val onHandoffPending: () -> Unit = {},
-) : CanvasInputSink, InProgressStrokesFinishedListener {
+    private val onReleasePending: () -> Unit = {},
+) : CanvasInputSink {
 
     private class ActiveStroke(
         val sink: CanvasInputSink,
@@ -47,26 +50,51 @@ internal class WetStrokeRouter(
         val kind: PointerKind,
         val downTimeMillis: Long,
         var lastElapsedMillis: Long = 0L,
+        val samples: Samples = Samples(),
     )
+
+    /** The samples fed to Ink, kept so the finished stroke is built without Ink. */
+    private class Samples {
+        private var size = 0
+        private var x = FloatArray(64)
+        private var y = FloatArray(64)
+        private var pressure = FloatArray(64)
+        private var time = FloatArray(64)
+
+        /** Records a sample; false for a repeat of the previous one, which Ink rejects (pen-ups often repeat the last move). */
+        fun add(px: Float, py: Float, p: Float, t: Long): Boolean {
+            if (size > 0 && x[size - 1] == px && y[size - 1] == py && time[size - 1] == t.toFloat()) return false
+            if (size == x.size) {
+                x = x.copyOf(size * 2); y = y.copyOf(size * 2); pressure = pressure.copyOf(size * 2); time = time.copyOf(size * 2)
+            }
+            x[size] = px; y[size] = py; pressure[size] = p; time[size] = t.toFloat()
+            size++
+            return true
+        }
+
+        fun toStrokePoints(): StrokePoints = StrokePoints.of(
+            x.copyOf(size), y.copyOf(size), pressure.copyOf(size), FloatArray(size), FloatArray(size), time.copyOf(size),
+        )
+    }
 
     var view: InProgressStrokesView? = null
         set(value) {
             if (value === field) return
             field?.let { old ->
-                // A stroke still being drawn on the old view would otherwise stay on screen forever.
+                // Nothing may stay on the old view: a stroke still drawn, or a lifted one awaiting release.
                 active?.let { old.cancelStroke(it.id) }
-                old.removeFinishedStrokesListener(this)
+                pendingRelease.forEach { old.cancelStroke(it) }
             }
             active = null
+            pendingRelease.clear()
             field = value
-            value?.addFinishedStrokesListener(this)
         }
 
     private var active: ActiveStroke? = null
     /** The sink that received the current gesture's DOWN; it gets every event until UP or CANCEL. */
     private var gestureSink: CanvasInputSink? = null
-    private val awaitingFinish = HashMap<InProgressStrokeId, ActiveStroke>()
-    private val pendingHandoff = LinkedHashSet<InProgressStrokeId>()
+    /** Lifted strokes whose Ink copy is cancelled once the dry layer has drawn them. */
+    private val pendingRelease = LinkedHashSet<InProgressStrokeId>()
 
     override fun onPointer(event: CanvasPointerEvent) {
         val sink = if (event.phase == PointerPhase.DOWN) downstream().also { gestureSink = it } else gestureSink ?: downstream()
@@ -80,29 +108,16 @@ internal class WetStrokeRouter(
         if (event.phase == PointerPhase.UP || event.phase == PointerPhase.CANCEL) gestureSink = null
     }
 
-    override fun onStrokesFinished(strokes: Map<InProgressStrokeId, Stroke>) {
-        for ((id, stroke) in strokes) {
-            val record = awaitingFinish.remove(id) ?: continue
-            record.sink.onWetStrokeFinished(
-                FinishedStroke(
-                    stroke = stroke,
-                    frame = record.frame,
-                    points = InkBridge.toStrokePoints(stroke.inputs),
-                    brush = record.brush,
-                    kind = record.kind,
-                ),
-            )
-        }
-        pendingHandoff += strokes.keys
-        onHandoffPending()
-    }
-
-    /** Called by the canvas after it has drawn a frame; returns the Ink strokes that can now be released. */
-    fun drainHandoff(): Set<InProgressStrokeId>? {
-        if (pendingHandoff.isEmpty()) return null
-        val ids = pendingHandoff.toSet()
-        pendingHandoff.clear()
-        return ids
+    /**
+     * Called by the canvas after it has drawn a frame: the strokes lifted before that frame are now
+     * drawn dry, so Ink's copies can go.
+     */
+    fun releaseAfterDraw() {
+        if (pendingRelease.isEmpty()) return
+        val inkView = view
+        val ids = pendingRelease.toList()
+        pendingRelease.clear()
+        if (inkView != null) inkView.post { ids.forEach { inkView.cancelStroke(it) } }
     }
 
     private fun begin(sink: CanvasInputSink, event: CanvasPointerEvent) {
@@ -115,10 +130,11 @@ internal class WetStrokeRouter(
             transform = CanvasMath.frameToScreen(camera, viewport(), event.world, level),
         )
         val brush = wetStrokeBrush(frame) ?: return
+        val pressure = event.pressure.coerceIn(0f, 1f)
         val record = ActiveStroke(
             sink = sink,
             id = inkView.startStroke(
-                InkBridge.strokeInput(x = 0f, y = 0f, elapsedMillis = 0L, kind = event.kind, pressure = event.pressure),
+                InkBridge.strokeInput(x = 0f, y = 0f, elapsedMillis = 0L, kind = event.kind, pressure = pressure),
                 InkBridge.toInkBrush(brush),
                 frame.transform.toAndroidMatrix(),
             ),
@@ -127,19 +143,25 @@ internal class WetStrokeRouter(
             kind = event.kind,
             downTimeMillis = event.timeMillis,
         )
+        record.samples.add(0f, 0f, pressure, 0L)
         active = record
     }
 
     private fun extend(record: ActiveStroke, event: CanvasPointerEvent) {
         val inkView = view ?: return
-        inkView.addToStroke(MutableStrokeInputBatch().add(record.input(event)), record.id)
+        record.input(event)?.let { inkView.addToStroke(MutableStrokeInputBatch().add(it), record.id) }
     }
 
     private fun finish(record: ActiveStroke, event: CanvasPointerEvent) {
         active = null
         val inkView = view ?: return
-        awaitingFinish[record.id] = record
-        inkView.finishStroke(record.input(event), record.id)
+        // The last sample is drawn wet too, but the stroke is not finished in Ink (see the class doc).
+        record.input(event)?.let { inkView.addToStroke(MutableStrokeInputBatch().add(it), record.id) }
+        record.sink.onWetStrokeFinished(
+            FinishedStroke(frame = record.frame, points = record.samples.toStrokePoints(), brush = record.brush, kind = record.kind),
+        )
+        pendingRelease += record.id
+        onReleasePending()
     }
 
     private fun cancel(record: ActiveStroke) {
@@ -147,10 +169,13 @@ internal class WetStrokeRouter(
         view?.cancelStroke(record.id)
     }
 
-    private fun ActiveStroke.input(event: CanvasPointerEvent) = run {
+    /** The next Ink input for [event] in this stroke's frame, also recorded for the finished stroke; null for a repeat. */
+    private fun ActiveStroke.input(event: CanvasPointerEvent): StrokeInput? {
         val local = FrameLevels.worldToLocal(event.world, frame.anchor, frame.level)
         val elapsed = (event.timeMillis - downTimeMillis).coerceAtLeast(lastElapsedMillis)
         lastElapsedMillis = elapsed
-        InkBridge.strokeInput(local.x, local.y, elapsed, kind, event.pressure)
+        val pressure = event.pressure.coerceIn(0f, 1f)
+        if (!samples.add(local.x, local.y, pressure, elapsed)) return null
+        return InkBridge.strokeInput(local.x, local.y, elapsed, kind, pressure)
     }
 }

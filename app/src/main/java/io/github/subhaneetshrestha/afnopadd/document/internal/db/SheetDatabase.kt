@@ -15,9 +15,15 @@ import java.io.File
  * added to it directly until the first sharing release freezes the schema; after that, every
  * change is a migration with a golden-file test.
  */
+/**
+ * The Room schema version of a sheet database, which SQLite keeps in `user_version`. The store
+ * rejects files with a higher one before Room opens them, so this is the single place to bump it.
+ */
+internal const val SHEET_DATABASE_VERSION = 1
+
 @Database(
     entities = [MetaEntity::class, ElementEntity::class, StrokePointsEntity::class, AssetEntity::class, OpEntity::class],
-    version = 1,
+    version = SHEET_DATABASE_VERSION,
     exportSchema = true,
 )
 abstract class SheetDatabase : RoomDatabase() {

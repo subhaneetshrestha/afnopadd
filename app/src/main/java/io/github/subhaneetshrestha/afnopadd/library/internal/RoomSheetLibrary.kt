@@ -1,6 +1,7 @@
 package io.github.subhaneetshrestha.afnopadd.library.internal
 
 import android.util.Log
+import io.github.subhaneetshrestha.afnopadd.document.SheetFormatException
 import io.github.subhaneetshrestha.afnopadd.document.SheetId
 import io.github.subhaneetshrestha.afnopadd.document.SheetStore
 import io.github.subhaneetshrestha.afnopadd.document.Ulid
@@ -156,14 +157,18 @@ internal class RoomSheetLibrary(
         rows.filter { it.dirName !in present }.forEach { dao.delete(it.id) }
         val known = rows.map { it.dirName }.toSet()
         for (dir in dirs.filter { it.name !in known }) {
-            // Runs at every launch: one damaged directory must never stop the app from starting.
+            // Runs at every launch: one damaged directory must never stop the app from starting. Only
+            // a sheet that is itself unreadable is quarantined; any other failure (a full disk, say)
+            // leaves it in place so the next launch can try again.
             try {
                 registerLocked(dir)
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: Exception) {
+            } catch (e: SheetFormatException) {
                 Log.w(TAG, "Quarantining unreadable sheet directory ${dir.name}", e)
                 quarantineLocked(dir)
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not register sheet directory ${dir.name}; leaving it for the next reconcile", e)
             }
         }
         purgeTrash()

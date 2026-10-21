@@ -15,6 +15,7 @@ import io.github.subhaneetshrestha.afnopadd.document.SheetStore
 import io.github.subhaneetshrestha.afnopadd.document.StrokePoints
 import io.github.subhaneetshrestha.afnopadd.document.Ulid
 import io.github.subhaneetshrestha.afnopadd.document.internal.db.MetaEntity
+import io.github.subhaneetshrestha.afnopadd.document.internal.db.SHEET_DATABASE_VERSION
 import io.github.subhaneetshrestha.afnopadd.document.internal.db.SheetDatabase
 import io.github.subhaneetshrestha.afnopadd.document.internal.db.openSheetDatabase
 import io.github.subhaneetshrestha.afnopadd.document.internal.db.toElement
@@ -147,9 +148,10 @@ internal class RoomSheetStore(
     }
 
     /**
-     * Runs [block] on a sheet database that [verifySheetFile] accepted, turning any SQLite or Room
-     * failure into a [SheetFormatException]: a damaged or foreign file is an expected condition the
-     * library and editor handle, not a crash.
+     * Runs [block] on a sheet database that [verifySheetFile] accepted. Damage to the file (SQLite
+     * corruption, or a schema Room cannot validate) becomes a [SheetFormatException], an expected
+     * condition the library and editor handle. Temporary trouble such as a full disk or a lock is
+     * rethrown as it is, so nobody mistakes a healthy sheet for a broken one.
      */
     private suspend fun <T> readingSheet(file: File, block: suspend (File) -> T): T {
         verifySheetFile(file)
@@ -160,6 +162,7 @@ internal class RoomSheetStore(
         } catch (e: SheetFormatException) {
             throw e
         } catch (e: SQLException) {
+            if (!SqliteErrors.isCorruption(e.message)) throw e
             throw SheetFormatException("Sheet database $file is not readable: ${e.message}", e)
         } catch (e: IllegalStateException) {
             throw SheetFormatException("Sheet database $file could not be opened: ${e.message}", e)
@@ -184,6 +187,7 @@ internal class RoomSheetStore(
                 connection.close()
             }
         } catch (e: SQLException) {
+            if (!SqliteErrors.isCorruption(e.message)) throw e
             throw SheetFormatException("$file is not a readable SQLite database: ${e.message}", e)
         }
         when {
@@ -253,8 +257,6 @@ internal class RoomSheetStore(
 
     internal companion object {
         const val ASSETS_DIRECTORY = "assets"
-        /** The Room `@Database(version = …)` of [SheetDatabase]; SQLite keeps it in `user_version`. */
-        const val SHEET_DATABASE_VERSION = 1L
         private val SQLITE_HEADER = "SQLite format 3\u0000".toByteArray(Charsets.US_ASCII)
         const val OPS_TO_KEEP = 1_000
         const val DECODE_CHUNK_SIZE = 256

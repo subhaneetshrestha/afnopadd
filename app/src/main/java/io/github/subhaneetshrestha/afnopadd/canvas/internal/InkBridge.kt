@@ -6,11 +6,9 @@ import androidx.ink.brush.BrushFamily
 import androidx.ink.brush.InputToolType
 import androidx.ink.brush.StockBrushes
 import androidx.ink.strokes.StrokeInput
-import androidx.ink.strokes.StrokeInputBatch
 import io.github.subhaneetshrestha.afnopadd.canvas.FrameTransform
 import io.github.subhaneetshrestha.afnopadd.canvas.PointerKind
 import io.github.subhaneetshrestha.afnopadd.document.BrushSpec
-import io.github.subhaneetshrestha.afnopadd.document.StrokePoints
 import kotlin.math.roundToInt
 
 /** Conversions between Afnopadd's document types and Jetpack Ink's, kept in one place so Ink stays replaceable. */
@@ -59,28 +57,6 @@ internal object InkBridge {
                 pressure = pressure.coerceIn(0f, 1f),
             )
         }
-
-    /** Copies an Ink input batch into Afnopadd's packed point format. */
-    fun toStrokePoints(batch: StrokeInputBatch): StrokePoints {
-        val count = batch.size
-        val x = FloatArray(count)
-        val y = FloatArray(count)
-        val pressure = FloatArray(count)
-        val tilt = FloatArray(count)
-        val orientation = FloatArray(count)
-        val time = FloatArray(count)
-        val scratch = StrokeInput()
-        for (i in 0 until count) {
-            val input = batch.populate(i, scratch)
-            x[i] = input.x
-            y[i] = input.y
-            pressure[i] = if (input.hasPressure) input.pressure else 1f
-            tilt[i] = if (input.hasTilt) input.tiltRadians else 0f
-            orientation[i] = if (input.hasOrientation) input.orientationRadians else 0f
-            time[i] = input.elapsedTimeMillis.toFloat()
-        }
-        return StrokePoints.of(x, y, pressure, tilt, orientation, time)
-    }
 
     fun FrameTransform.toAndroidMatrix(): Matrix {
         val values = asFloat()

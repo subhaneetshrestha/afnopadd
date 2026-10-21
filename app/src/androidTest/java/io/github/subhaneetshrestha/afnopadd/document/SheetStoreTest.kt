@@ -3,6 +3,7 @@ package io.github.subhaneetshrestha.afnopadd.document
 import android.util.Log
 import io.github.subhaneetshrestha.afnopadd.document.internal.RoomSheetStore
 import io.github.subhaneetshrestha.afnopadd.document.internal.db.MetaEntity
+import io.github.subhaneetshrestha.afnopadd.document.internal.db.SHEET_DATABASE_VERSION
 import io.github.subhaneetshrestha.afnopadd.document.internal.db.SheetDatabase
 import io.github.subhaneetshrestha.afnopadd.document.internal.db.openSheetDatabase
 import io.github.subhaneetshrestha.afnopadd.document.internal.db.toElementEntity
@@ -153,6 +154,15 @@ class SheetStoreTest {
         } finally {
             connection.close()
         }
+    }
+
+    @Test
+    fun aNewSheetCarriesTheSchemaVersionTheStoreAccepts() = runBlocking {
+        val dir = File(root, "versioned")
+        store.create(dir, title = "Versioned").close()
+
+        assertEquals(SHEET_DATABASE_VERSION.toLong(), userVersion(File(dir, SheetStore.DATABASE_FILE_NAME)))
+        store.open(dir).close() // and the store reopens what it wrote
     }
 
     @Test

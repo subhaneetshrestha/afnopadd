@@ -1,6 +1,5 @@
 package io.github.subhaneetshrestha.afnopadd.canvas
 
-import androidx.ink.strokes.Stroke
 import io.github.subhaneetshrestha.afnopadd.document.BrushSpec
 import io.github.subhaneetshrestha.afnopadd.document.StrokePoints
 import io.github.subhaneetshrestha.afnopadd.document.WorldPoint
@@ -30,9 +29,8 @@ data class CanvasPointerEvent(
  */
 data class StrokeFrame(val anchor: WorldPoint, val level: Int, val transform: FrameTransform)
 
-/** A wet stroke that Ink has finished: the Ink stroke itself plus everything needed to make a `StrokeElement`. */
+/** A stroke the user has just lifted: everything needed to make a `StrokeElement`, in the stroke's frame units. */
 class FinishedStroke(
-    val stroke: Stroke,
     val frame: StrokeFrame,
     val points: StrokePoints,
     val brush: BrushSpec,
@@ -43,6 +41,7 @@ class FinishedStroke(
 interface CanvasInputSink {
     fun onPointer(event: CanvasPointerEvent)
 
+    /** Called at pen-up with the lifted stroke; the canvas draws whatever the tool commits from the next frame. */
     fun onWetStrokeFinished(stroke: FinishedStroke) = Unit
 }
 

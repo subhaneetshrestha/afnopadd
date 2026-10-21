@@ -108,11 +108,9 @@ class WetStrokeTest {
         )
         assertEquals(expectedLast.x, points.x(points.count - 1), 1e-2f)
         assertEquals(expectedLast.y, points.y(points.count - 1), 1e-2f)
-        assertEquals(points.count, finished.stroke.inputs.size)
         assertTrue(points.pressure(0) in 0f..1f)
         assertEquals(PointerKind.FINGER, finished.kind)
         assertEquals((SIZE_PX / finished.frame.transform.scale).toFloat(), finished.brush.size, 1e-6f)
-        assertEquals(finished.brush.size, finished.stroke.brush.size, 1e-6f)
     }
 
     @Test

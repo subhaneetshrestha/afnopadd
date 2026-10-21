@@ -43,5 +43,20 @@ editor and in other tests were the same race; an overloaded host made it far mor
   starts a `HandlerThread` per `InProgressStrokesView` and never quits it. The canvas therefore
   takes its Ink view from `SharedInkView` (one per activity, reused across editor visits, dropped
   on `ON_DESTROY`) instead of creating one per visit; `InkThreadLeakTest` guards it.
+- Update 2026-10-21: the remaining crash has a reliable recipe. Removing the canvas (and with it
+  Ink's view) within about half a second of drawing a stroke crashes Ink 1.0.0, either as
+  `IllegalStateException: Unbalanced saves and restores` in
+  `CanvasInProgressStrokesRenderHelperV33$Viewport.handleDraw` or as the libhwui SIGSEGV
+  (3 of 4 runs). It does not depend on whether Ink finished the stroke or how long its hand-over
+  debounce is, both measured. Ink hands a finished stroke over about 370–550 ms after pen-up.
+  - Data is safe regardless: the router now builds the stroke from its own samples and gives it to
+    the tool at pen-up, never asks Ink to finish it, and cancels Ink's in-progress copy once the
+    dry layer has drawn it. Leaving or rotating right after a stroke can no longer lose it.
+  - Tried and rejected: `requestHandoff()` and `handoffDebounceTimeMs` (both `@RestrictTo` the Ink
+    library, and measured to make no difference to the hand-over delay); `flush()` (asynchronous,
+    and blocked `onStop` until the activity hung in PAUSED).
+  - Next candidate: keep the Ink view attached for the activity's whole life (hosted at the
+    activity level and shown under the editor), so leaving the editor never detaches it; confirm on
+    a real device first.
 - The race and the thread leak should be reported upstream to the Jetpack Ink issue tracker with the bare-resize repro
   (owner's call: it is an outward-facing action).

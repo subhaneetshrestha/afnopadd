@@ -143,27 +143,31 @@ class DryStrokeRenderingTest {
         val pen = object : CanvasInputSink {
             override fun onPointer(event: CanvasPointerEvent) = Unit
             override fun onWetStrokeFinished(stroke: FinishedStroke) {
-                val box = stroke.stroke.shape.computeBoundingBox()
+                val points = stroke.points
+                val pad = stroke.brush.size / 2
                 val unit = FrameLevels.worldUnitsPerLocalUnit(stroke.frame.level)
+                val xs = (0 until points.count).map { points.x(it) }
+                val ys = (0 until points.count).map { points.y(it) }
+                val id = ElementId(ulid.next())
                 sheet.transact("pen") {
                     add(
                         StrokeElement(
-                            id = ElementId(ulid.next()),
+                            id = id,
                             anchor = stroke.frame.anchor,
                             frameLevel = stroke.frame.level,
                             z = FractionalIndex.first(),
                             bounds = WorldRect(
-                                stroke.frame.anchor.x + (box?.xMin ?: 0f) * unit,
-                                stroke.frame.anchor.y + (box?.yMin ?: 0f) * unit,
-                                stroke.frame.anchor.x + (box?.xMax ?: 0f) * unit,
-                                stroke.frame.anchor.y + (box?.yMax ?: 0f) * unit,
+                                stroke.frame.anchor.x + (xs.min() - pad) * unit,
+                                stroke.frame.anchor.y + (ys.min() - pad) * unit,
+                                stroke.frame.anchor.x + (xs.max() + pad) * unit,
+                                stroke.frame.anchor.y + (ys.max() + pad) * unit,
                             ),
                             version = 1,
                             versionNonce = 1,
                             createdAt = 1L,
                             updatedAt = 1L,
                             brush = stroke.brush,
-                            points = stroke.points,
+                            points = points,
                         ),
                     )
                 }
@@ -179,8 +183,8 @@ class DryStrokeRenderingTest {
         }
         rule.waitUntil(timeoutMillis = 5_000) { sheet.snapshot.value.elements.isNotEmpty() }
 
-        // Two consecutive frames after the handoff: the stroke must be inked in both.
-        repeat(2) { frame ->
+        // Committed at pen-up while Ink still draws it wet, then handed over: every frame shows it once.
+        repeat(4) { frame ->
             rule.waitForIdle()
             val image = rule.onNodeWithTag(CANVAS_TAG).captureToImage()
             assertTrue("frame $frame should still show the stroke", image.isDark(300, 200))
@@ -223,6 +227,48 @@ class DryStrokeRenderingTest {
         assertEquals(3, cache.size)
         // First frame builds all five; each later frame rebuilds only the two that do not fit (LRU: 20).
         assertEquals(5 + 3 * 2, cache.buildCount)
+    }
+
+    @Test
+    fun aStrokeBiggerThanTheWholeBudgetIsDrawnWithoutEvictingAnything() {
+        val small = List(2) { horizontalStroke(0.0, 50.0, it * 10.0, sizeWorld = 4f) }
+        // Mesh size follows the samples, so "huge" means thousands of wiggling samples.
+        val wiggles = 3_000
+        val huge = horizontalStroke(0.0, 50.0, 500.0, sizeWorld = 4f).copy(
+            points = StrokePoints.of(
+                x = FloatArray(wiggles) { it * 0.5f },
+                y = FloatArray(wiggles) { if (it % 2 == 0) 0f else 6f },
+                pressure = FloatArray(wiggles) { 1f },
+                tiltRad = FloatArray(wiggles),
+                orientationRad = FloatArray(wiggles),
+                timeMillis = FloatArray(wiggles) { it * 4f },
+            ),
+        )
+        val perSmall = StrokeCache().also { it.strokeFor(small.first()) }.estimatedBytes
+        val hugeBytes = StrokeCache(maxBytes = Long.MAX_VALUE).also { it.strokeFor(huge) }.estimatedBytes
+        assertTrue("fixture: $hugeBytes bytes is not more than the ${perSmall * 3} budget", hugeBytes > perSmall * 3)
+        val cache = StrokeCache(maxBytes = perSmall * 3)
+        small.forEach { cache.strokeFor(it) }
+
+        cache.strokeFor(huge)
+
+        assertEquals("the oversized stroke evicted the others", 2, cache.size)
+        assertTrue(cache.estimatedBytes <= perSmall * 3)
+    }
+
+    @Test
+    fun aChangedStrokeReplacesItsCachedMesh() {
+        val stroke = horizontalStroke(0.0, 500.0, 0.0, sizeWorld = 4f)
+        val cache = StrokeCache()
+        val first = cache.strokeFor(stroke)
+
+        val moved = stroke.copy(points = horizontalStroke(0.0, 200.0, 0.0, sizeWorld = 4f).points)
+        val second = cache.strokeFor(moved)
+
+        assertEquals(1, cache.size)
+        assertTrue("a new mesh is built for new points", first !== second)
+        val alone = StrokeCache().also { it.strokeFor(moved) }.estimatedBytes
+        assertEquals("the old mesh is still counted", alone, cache.estimatedBytes)
     }
 
     private companion object {

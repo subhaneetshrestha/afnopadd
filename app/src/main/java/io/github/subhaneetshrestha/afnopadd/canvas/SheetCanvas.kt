@@ -53,16 +53,16 @@ fun SheetCanvas(
     val snapshot by sheet.snapshot.collectAsState()
     val camera by cameraController.camera.collectAsState()
     var viewport by remember { mutableStateOf(Viewport(0, 0)) }
-    var handoffTick by remember { mutableIntStateOf(0) }
+    var releaseTick by remember { mutableIntStateOf(0) }
     val dryLayer = remember { DryLayer() }
     // One router for the canvas's lifetime; it reads the current tool when each gesture starts, so a
     // tool switch never strands a stroke that the previous tool started.
     val currentSink by rememberUpdatedState(inputSink)
     val currentBrush by rememberUpdatedState(wetStrokeBrush)
     val router = remember(cameraController) {
-        WetStrokeRouter({ currentSink }, cameraController, { viewport }, { frame -> currentBrush(frame) }, onHandoffPending = { handoffTick++ })
+        WetStrokeRouter({ currentSink }, cameraController, { viewport }, { frame -> currentBrush(frame) }, onReleasePending = { releaseTick++ })
     }
-    // A replaced router must stop listening to the Ink view, or the view keeps it and its tools alive.
+    // A replaced router must drop its Ink view, or the view keeps it and its tools alive.
     DisposableEffect(router) { onDispose { router.view = null } }
 
     Box(
@@ -76,16 +76,14 @@ fun SheetCanvas(
         Spacer(
             modifier = Modifier.fillMaxSize().drawBehind {
                 @Suppress("UNUSED_EXPRESSION")
-                handoffTick // read so a pending handoff redraws the dry layer even if nothing else changed
+                releaseTick // read so a lifted stroke redraws the dry layer even if nothing else changed
                 drawBackground(background, camera, viewport)
                 drawIntoCanvas { composeCanvas ->
                     val visible = index.visible(snapshot, visibleRect(camera, viewport))
                     dryLayer.draw(composeCanvas.nativeCanvas, visible, hiddenElements, camera, viewport)
                 }
-                // The dry layer now holds everything the tool committed; let Ink drop its copies after this frame.
-                router.drainHandoff()?.let { ids ->
-                    router.view?.let { view -> view.post { view.removeFinishedStrokes(ids) } }
-                }
+                // The dry layer now draws everything the tool committed; Ink's copies can go after this frame.
+                router.releaseAfterDraw()
             },
         )
         // Jetpack Ink's low-latency wet-stroke layer. It never handles touch itself; the gesture
