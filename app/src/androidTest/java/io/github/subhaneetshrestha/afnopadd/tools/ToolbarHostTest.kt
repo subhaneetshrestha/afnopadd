@@ -1,5 +1,10 @@
 package io.github.subhaneetshrestha.afnopadd.tools
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
@@ -12,6 +17,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import io.github.subhaneetshrestha.afnopadd.R
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -23,16 +29,17 @@ class ToolbarHostTest {
     @get:Rule
     val rule = createComposeRule()
 
+    private fun fakeTool(toolId: String, label: Int, icon: Int) = object : Tool {
+        override val id = toolId
+        override val labelRes = label
+        override val iconRes = icon
+        override val capabilities = setOf(ToolCapability.STROKE)
+        override fun createController(context: ToolContext): ToolController = throw UnsupportedOperationException()
+    }
+
     private val registry = ToolRegistry().apply {
-        register(
-            object : Tool {
-                override val id = "tool:pen"
-                override val labelRes = R.string.tool_pen
-                override val iconRes = R.drawable.ic_tool_pen
-                override val capabilities = setOf(ToolCapability.STROKE)
-                override fun createController(context: ToolContext): ToolController = throw UnsupportedOperationException()
-            },
-        )
+        register(fakeTool("tool:pen", R.string.tool_pen, R.drawable.ic_tool_pen))
+        register(fakeTool("tool:pencil", R.string.tool_pencil, R.drawable.ic_tool_pencil))
     }
     private val undoEnabled = MutableStateFlow(false)
     private var undoRuns = 0
@@ -65,6 +72,34 @@ class ToolbarHostTest {
 
         rule.onNodeWithTag(ToolbarTags.item("tool:hologram")).assertDoesNotExist()
         assertEquals("tool:pen", state.activeToolId.value)
+    }
+
+    @Test
+    fun tappingAnotherToolActivatesIt() {
+        val twoTools = spec.copy(toolbars = listOf(spec.toolbars.single().copy(items = listOf(ToolbarItem.Ref("tool:pen"), ToolbarItem.Ref("tool:pencil")))))
+        rule.setContent { ToolbarHost(spec = twoTools, registry = registry, commands = commands, state = state) }
+
+        rule.onNodeWithTag(ToolbarTags.item("tool:pencil")).performClick()
+        rule.waitForIdle()
+
+        assertEquals("tool:pencil", state.activeToolId.value)
+        rule.onNodeWithTag(ToolbarTags.item("tool:pencil")).assertIsSelected()
+    }
+
+    /** A layout asking for a side toolbar must not stretch over the canvas (side rails are not built yet). */
+    @Test
+    fun aSidePlacedToolbarStaysToolbarSized() {
+        val left = spec.copy(toolbars = listOf(spec.toolbars.single().copy(placement = Placement.LEFT)))
+        rule.setContent {
+            Box(Modifier.fillMaxSize()) {
+                ToolbarHost(spec = left, registry = registry, commands = commands, state = state, modifier = Modifier.testTag("host"))
+            }
+        }
+
+        val bounds = rule.onNodeWithTag("host").fetchSemanticsNode().boundsInRoot
+        val density = InstrumentationRegistry.getInstrumentation().targetContext.resources.displayMetrics.density
+        assertTrue("toolbar is ${bounds.height / density} dp tall", bounds.height / density < 120f)
+        rule.onNodeWithTag(ToolbarTags.item("tool:pen")).assertIsDisplayed()
     }
 
     @Test

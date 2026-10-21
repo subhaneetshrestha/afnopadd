@@ -79,6 +79,12 @@ The emulator's own host memory (`qemu-system-x86_64`) grew to 7.3 GB over a day 
 stayed flat within these loops, so that growth is the emulator's, not the app's. Restart it cold
 (`-no-snapshot-load`) when it passes about 6 GB.
 
+## 2026-10-20: scan-resistant stroke cache (review finding)
+
+| Idea | Baseline → result | Verdict | Why |
+|---|---|---|---|
+| `StrokeCache.beginFrame()`: meshes drawn in the current frame are never evicted for that frame; overflow is drawn uncached | 5 strokes drawn per frame against a 3-stroke budget: 20 builds over 4 frames → 11; overview and pan unchanged (119 ms / 1.3 ms) | kept | At working zoom, dense handwriting can exceed the budget with strokes above the 32 px sketch threshold, which was the same LRU thrash as the overview. A mutant without frames is caught by `theStrokeCacheKeepsWhatFitsWhenEveryFrameDrawsMoreThanItsBudget`. |
+
 ### Open gaps (not fixed here)
 
 - **Overview of a full sheet is still 120+ ms per frame.** 5,000 path draws per frame is too many for

@@ -23,6 +23,49 @@ class ToolbarSpecJsonTest {
         assertTrue(ToolbarItem.Ref("cmd:redo") in main.items)
     }
 
+    private fun layout(items: String, schemaVersion: String = "1") =
+        """{"schemaVersion":$schemaVersion,"toolbars":[{"id":"main","items":[$items]}]}"""
+
+    private fun nestedGroups(depth: Int): String {
+        var items = """{"ref":"tool:pen"}"""
+        repeat(depth) { items = """{"group":{"id":"g$it","items":[$items]}}""" }
+        return layout(items)
+    }
+
+    @Test
+    fun `groups nested within the limit parse`() {
+        val spec = ToolbarSpecJson.parse(nestedGroups(ToolbarSpecJson.MAX_GROUP_DEPTH))
+
+        assertTrue(spec.toolbars.single().items.single() is ToolbarItem.Group)
+    }
+
+    @Test
+    fun `deeply nested groups are rejected instead of overflowing the stack`() {
+        assertThrows(ToolbarSpecException::class.java) { ToolbarSpecJson.parse(nestedGroups(ToolbarSpecJson.MAX_GROUP_DEPTH + 1)) }
+        // An imported file of a few tens of kilobytes used to throw StackOverflowError here.
+        assertThrows(ToolbarSpecException::class.java) { ToolbarSpecJson.parse(nestedGroups(5_000)) }
+    }
+
+    @Test
+    fun `oversized layouts, item lists and ids are rejected`() {
+        assertThrows(ToolbarSpecException::class.java) {
+            ToolbarSpecJson.parse(layout("""{"ref":"tool:pen"}""") + " ".repeat(ToolbarSpecJson.MAX_LAYOUT_CHARS))
+        }
+        assertThrows(ToolbarSpecException::class.java) {
+            ToolbarSpecJson.parse(layout(List(ToolbarSpecJson.MAX_ITEMS + 1) { """{"ref":"tool:pen"}""" }.joinToString(",")))
+        }
+        assertThrows(ToolbarSpecException::class.java) {
+            ToolbarSpecJson.parse(layout("""{"ref":"tool:${"x".repeat(ToolbarSpecJson.MAX_ID_LENGTH)}"}"""))
+        }
+    }
+
+    @Test
+    fun `a schema version below one is rejected`() {
+        assertThrows(ToolbarSpecException::class.java) { ToolbarSpecJson.parse(layout("", schemaVersion = "0")) }
+        assertThrows(ToolbarSpecException::class.java) { ToolbarSpecJson.parse(layout("", schemaVersion = "-3")) }
+        assertThrows(ToolbarSpecException::class.java) { ToolbarSpecJson.parse(layout("", schemaVersion = "\"1\"")) }
+    }
+
     @Test
     fun `parses refs separators and groups and keeps unknown refs`() {
         val spec = ToolbarSpecJson.parse(

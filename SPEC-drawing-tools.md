@@ -52,7 +52,7 @@ Built-in commands: `cmd:undo`, `cmd:redo`, `cmd:zoom-in`, `cmd:zoom-out`, `cmd:z
 ## Testing
 
 - JVM unit tests per tool: scripted pointer sequences produce the expected transactions (count, element kinds, geometry within tolerance); cancellation mid-gesture commits nothing; constrain modifier produces exact squares and 45-degree lines; the hand tool produces camera changes and zero transactions; pinch sequences keep the focal point fixed in world space.
-- Registry and spec tests: parsing the default layout; unknown references are dropped with a logged warning; round trip of `ToolbarSpec` through JSON.
+- Registry and spec tests: parsing the default layout; unknown references are kept in the parsed spec (so a newer layout round-trips) and skipped with a logged warning when rendered; round trip of `ToolbarSpec` through JSON; untrusted layouts are bounded (64 K characters, groups nested at most 4 deep, 128 items per list, ids and labels of at most 128 characters, `schemaVersion` of at least 1) and anything outside the bounds is a `ToolbarSpecException`. Until side rails are built, `left`/`right` toolbars render as rows (2026-10-20 review).
 - Compose UI tests: tapping a tool button activates it; the toolbar re-renders when the spec changes; undo button state follows `canUndo`; zoom readout updates.
 - Instrumented: drawing a stroke with each stroke tool creates a `StrokeElement` whose Ink mapping matches decision 2.
 

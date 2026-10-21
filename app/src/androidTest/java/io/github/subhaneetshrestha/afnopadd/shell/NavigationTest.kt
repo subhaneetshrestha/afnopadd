@@ -50,6 +50,7 @@ class NavigationTest {
 
         composeRule.activityRule.scenario.recreate()
 
+        composeRule.waitUntil(timeoutMillis = 10_000) { composeRule.onAllNodesWithTag(ShellTags.EDITOR_SCREEN).fetchSemanticsNodes().isNotEmpty() }
         composeRule.onNodeWithTag(ShellTags.EDITOR_SCREEN).assertIsDisplayed()
     }
 

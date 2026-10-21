@@ -55,6 +55,7 @@ internal class DryLayer(
     val sketchCount: Int get() = sketches.size
 
     fun draw(canvas: Canvas, elements: List<Element>, hidden: Set<ElementId>, camera: Camera, viewport: Viewport) {
+        cache.beginFrame()
         for (element in elements) {
             if (element.id in hidden) continue
             if (element is StrokeElement) {

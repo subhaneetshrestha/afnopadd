@@ -14,34 +14,54 @@ import kotlin.math.roundToLong
  * and keeps the most recently drawn ones, up to a byte budget. Meshes are never persisted: this
  * cache is the only place they live, and evicting one just means re-tessellating it next time.
  * Used from the UI thread only.
+ *
+ * A caller that draws frames calls [beginFrame] first. Within a frame, meshes already drawn are
+ * never evicted to make room: when more strokes are on screen than the budget holds, the overflow
+ * is built, drawn and dropped instead. Plain LRU would evict each mesh just before the next frame
+ * needs it and rebuild everything every frame. Callers that never begin frames get plain LRU.
  */
 internal class StrokeCache(private val maxBytes: Long = DEFAULT_MAX_BYTES) {
 
-    private class Entry(val points: StrokePoints, val brushKey: Any, val stroke: Stroke, val bytes: Long)
+    private class Entry(val points: StrokePoints, val brushKey: Any, val stroke: Stroke, val bytes: Long, var frame: Long)
 
     private val entries = object : LinkedHashMap<ElementId, Entry>(64, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<ElementId, Entry>): Boolean = false
     }
+
+    /** The current frame; 0 until [beginFrame] is first called, which leaves the cache plain LRU. */
+    private var frame = 0L
 
     var estimatedBytes: Long = 0
         private set
 
     val size: Int get() = entries.size
 
-    fun strokeFor(element: StrokeElement): Stroke {
-        val cached = entries[element.id]
-        if (cached != null && cached.points === element.points && cached.brushKey == element.brush) return cached.stroke
-        val stroke = build(element)
-        val bytes = estimateBytes(stroke, element.points)
-        cached?.let { estimatedBytes -= it.bytes }
-        entries[element.id] = Entry(element.points, element.brush, stroke, bytes)
-        estimatedBytes += bytes
-        evict()
-        return stroke
+    /** How many strokes this cache has tessellated, cached or not; for tests and the perf ledger. */
+    var buildCount: Long = 0
+        private set
+
+    fun beginFrame() {
+        frame++
     }
 
-    fun remove(id: ElementId) {
-        entries.remove(id)?.let { estimatedBytes -= it.bytes }
+    fun strokeFor(element: StrokeElement): Stroke {
+        val cached = entries[element.id]
+        if (cached != null && cached.points === element.points && cached.brushKey == element.brush) {
+            cached.frame = frame
+            return cached.stroke
+        }
+        val stroke = build(element)
+        val bytes = estimateBytes(stroke, element.points)
+        cached?.let {
+            entries.remove(element.id)
+            estimatedBytes -= it.bytes
+        }
+        evict(toFit = bytes)
+        if (estimatedBytes + bytes <= maxBytes || entries.isEmpty()) {
+            entries[element.id] = Entry(element.points, element.brush, stroke, bytes, frame)
+            estimatedBytes += bytes
+        }
+        return stroke
     }
 
     fun clear() {
@@ -49,16 +69,19 @@ internal class StrokeCache(private val maxBytes: Long = DEFAULT_MAX_BYTES) {
         estimatedBytes = 0
     }
 
-    private fun evict() {
+    /** Evicts least recently used entries until [toFit] more bytes fit, sparing those drawn in the current frame. */
+    private fun evict(toFit: Long) {
         val iterator = entries.entries.iterator()
-        while (estimatedBytes > maxBytes && entries.size > 1 && iterator.hasNext()) {
+        while (estimatedBytes + toFit > maxBytes && iterator.hasNext()) {
             val eldest = iterator.next()
+            if (frame > 0 && eldest.value.frame == frame) continue
             iterator.remove()
             estimatedBytes -= eldest.value.bytes
         }
     }
 
     private fun build(element: StrokeElement): Stroke {
+        buildCount++
         val points = element.points
         val batch = MutableStrokeInputBatch()
         val input = StrokeInput()

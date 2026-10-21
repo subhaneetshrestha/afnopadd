@@ -4,13 +4,10 @@ import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.FilledIconToggleButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -18,6 +15,7 @@ import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -59,23 +57,20 @@ fun ToolbarHost(
     modifier: Modifier = Modifier,
 ) {
     val activeToolId by state.activeToolId.collectAsState()
-    for (toolbar in spec.toolbars) {
-        val horizontal = toolbar.placement == Placement.TOP || toolbar.placement == Placement.BOTTOM
-        if (horizontal) {
+    // Side rails are not built yet. A left or right toolbar used to fill the height of the bar it
+    // sits in, which covered the whole canvas; until rails exist every toolbar is a row.
+    LaunchedEffect(spec) {
+        spec.toolbars.filter { it.placement == Placement.LEFT || it.placement == Placement.RIGHT }
+            .forEach { Log.w(TAG, "Toolbar '${it.id}' asks for ${it.placement}; side toolbars are shown as rows for now") }
+    }
+    Column(modifier = modifier.fillMaxWidth()) {
+        for (toolbar in spec.toolbars) {
             Row(
-                modifier = modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                ToolbarItems(toolbar.items, registry, commands, state, activeToolId, horizontal = true)
-            }
-        } else {
-            Column(
-                modifier = modifier.fillMaxHeight().padding(horizontal = 4.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                ToolbarItems(toolbar.items, registry, commands, state, activeToolId, horizontal = false)
+                ToolbarItems(toolbar.items, registry, commands, state, activeToolId)
             }
         }
     }
@@ -88,7 +83,6 @@ private fun ToolbarItems(
     commands: CommandRegistry,
     state: ToolbarState,
     activeToolId: String,
-    horizontal: Boolean,
 ) {
     for (item in items) {
         when (item) {
@@ -101,8 +95,8 @@ private fun ToolbarItems(
                 } ?: Log.w(TAG, "Layout refers to unknown command '${item.id}'")
                 else -> Log.w(TAG, "Layout item '${item.id}' is not supported yet")
             }
-            ToolbarItem.Separator -> if (horizontal) VerticalDivider(Modifier.height(32.dp)) else HorizontalDivider(Modifier.width(32.dp))
-            is ToolbarItem.Group -> ToolbarItems(item.items, registry, commands, state, activeToolId, horizontal)
+            ToolbarItem.Separator -> VerticalDivider(Modifier.height(32.dp))
+            is ToolbarItem.Group -> ToolbarItems(item.items, registry, commands, state, activeToolId)
         }
     }
 }

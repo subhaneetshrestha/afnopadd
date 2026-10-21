@@ -204,6 +204,27 @@ class DryStrokeRenderingTest {
         assertEquals(elements.first().brush.size, rebuilt.brush.size, 1e-6f)
     }
 
+    /**
+     * More strokes on screen than the budget holds, drawn in the same order every frame: a plain
+     * LRU evicts each mesh just before it is needed (4.9 s frames in PERF.md). Meshes drawn this
+     * frame must stay, and the overflow is drawn uncached.
+     */
+    @Test
+    fun theStrokeCacheKeepsWhatFitsWhenEveryFrameDrawsMoreThanItsBudget() {
+        val elements = List(5) { horizontalStroke(0.0, 500.0, it * 10.0, sizeWorld = 4f) }
+        val perStroke = StrokeCache().also { it.strokeFor(elements.first()) }.estimatedBytes
+        val cache = StrokeCache(maxBytes = perStroke * 3 + perStroke / 2)
+
+        repeat(4) {
+            cache.beginFrame()
+            elements.forEach { cache.strokeFor(it) }
+        }
+
+        assertEquals(3, cache.size)
+        // First frame builds all five; each later frame rebuilds only the two that do not fit (LRU: 20).
+        assertEquals(5 + 3 * 2, cache.buildCount)
+    }
+
     private companion object {
         const val CANVAS_TAG = "sheet-canvas"
     }

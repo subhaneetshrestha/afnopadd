@@ -472,6 +472,7 @@ Done 2026-10-20.
 **Acceptance criteria:**
 - [x] Root cause identified and recorded in `docs/adr/0003-fixed-size-ink-surface.md`: Jetpack Ink 1.0.0's `InProgressStrokesView` races when resized (its render helper draws into a torn-down viewport: `IllegalStateException` in `CanvasInProgressStrokesRenderHelperV33`, or the libhwui SIGSEGV). The editor resized it on every tool switch that showed or hid the options bar.
 - [x] Avoided: the canvas keeps a fixed size and the bars float over it (`switchingToolsNeverResizesTheCanvas` guards it). `EditorFlowTest` then ran ten times in a row with no native crash and no failure (70 test executions, 2026-10-20).
+- [ ] Residual (2026-10-21): the same RenderThread SIGSEGV still appears on an emulator that has run many test cycles. With the emulator at 6.5–6.9 GB of host memory, the shell tests crashed in 2 of 2 runs, on the group-3 commit as well as with later changes (bisected). On a cold-booted emulator, 2 shell runs and a full 87-test run had no crash. Re-entering the editor 30 times did not reproduce it. Next: confirm on a real device before Checkpoint C; if it reproduces there, try Ink 1.1 once it is stable.
 - [x] Found on the way: Ink starts a render-helper thread per view and never quits it (30 threads after 30 editor visits). Fixed with `SharedInkView` (one view per activity); `InkThreadLeakTest` guards it; numbers in `docs/perf/PERF.md`.
 
 Done 2026-10-20.
