@@ -611,14 +611,16 @@ Done 2026-10-21.
 **Description:** Add uniform-scale and rotate handles to the selection overlay. Scaling multiplies stroke points and shape geometry about the selection centre; rotation sets `rotationDeg` on images and shapes and rotates stroke points; both are one transaction per gesture and work on multi-selections.
 
 **Acceptance criteria:**
-- [ ] Scaling a selection by 2x doubles distances between element anchors and stroke extents within float tolerance; the inverse gesture restores them.
-- [ ] Rotating 90 degrees produces the expected geometry for strokes, shapes, and images (unit tests with fixtures).
-- [ ] Handles stay a constant screen size at every zoom.
+- [x] Scaling a selection by 2x doubles distances between element anchors and stroke extents within float tolerance; the inverse gesture restores them (`TransformsTest`; `SelectToolTest` drags the scale handle to twice the distance).
+- [x] Rotating 90 degrees produces the expected geometry for strokes, shapes, and images (`TransformsTest`: stroke points and pen orientation, line endpoints, rectangle and image `rotationDeg` about their centre, four quarter turns back to the start; `SelectToolTest` turns the rotate handle a quarter, with 15-degree snapping).
+- [x] Handles stay a constant screen size at every zoom (`SelectToolTest` checks their offsets from 0.01x to 20,000x; `SelectionOverlayTest` measures the drawn ring at 20x and 50x).
 
 **Verification:**
-- [ ] Tests pass: `.\gradlew.bat testDebugUnitTest --tests "*.tools.select.*"`
-- [ ] Build succeeds: `.\gradlew.bat assembleDebug`
-- [ ] Manual check: scale and rotate mixed selections
+- [x] Tests pass: `.\gradlew.bat testDebugUnitTest --tests "*.tools.select.*"` (29); `.\gradlew.bat check` (222, Lint); instrumented `SelectionOverlayTest` (3), `ShapeRenderingTest.aRotatedSquareIsDrawnAsADiamond`, `EditorFlowTest.theSelectionHandlesScaleAndRotateIt`; full suite 123/123 on a cold `afnopadd36`, no native crash. Mutation checks: handles that ignore zoom, no snapping, hit-testing or painting without rotation, and a codec that drops it each fail a test.
+- [x] Build succeeds: `.\gradlew.bat assembleDebug`
+- [ ] Manual check: scale and rotate mixed selections (owner)
+
+Notes: `ShapeElement` gained `rotationDeg` (default 0, written only when non-zero, so existing files are unchanged; the format is not frozen until the first sharing release; recorded in SPEC-sheet-document). Rectangles and ellipses turn about their box centre; a turned line or arrow stores turned endpoints. Images already had `rotationDeg`; its meaning is now fixed as a turn about the image's centre with the anchor at its unturned corner (image drawing arrives in Task 23). Notes and unknown element kinds are left untransformed. A press on a handle only transforms once it drags past the slop, so a tap near a small selection's handle still selects (found by the existing tap test). The scale handle is at the outline's bottom-right corner and the rotate handle floats 28 dp above its top centre; both sit in dp converted through the zoom.
 
 **Dependencies:** Task 20
 
@@ -626,6 +628,8 @@ Done 2026-10-21.
 - `tools/select/TransformHandles.kt`, `tools/select/Transforms.kt`, `tools/select/SelectTool.kt`
 
 **Estimated scope:** Medium
+
+Done 2026-10-21.
 
 ---
 

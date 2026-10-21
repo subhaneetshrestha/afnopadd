@@ -29,8 +29,12 @@ sealed interface Element {
     val createdAt: Long; val updatedAt: Long
 }
 data class StrokeElement(..., val brush: BrushSpec, val points: StrokePoints) : Element
-data class ShapeElement(..., val kind: ShapeKind, val geometry: ShapeGeometry, val style: ShapeStyle) : Element
+data class ShapeElement(..., val kind: ShapeKind, val geometry: ShapeGeometry, val style: ShapeStyle, val rotationDeg: Float = 0f) : Element
 data class ImageElement(..., val asset: AssetId, val size: LocalSize, val rotationDeg: Float, val crop: LocalRect?) : Element
+// rotationDeg (added in Task 21, before the format freeze): clockwise turn about the centre of the
+// shape's geometry box or the image's size box; the anchor is that box's corner before turning.
+// Only rectangles and ellipses use it (a turned line or arrow stores turned endpoints), and a shape
+// payload carries "rotationDeg" only when it is non-zero, so unrotated shapes are byte-for-byte as before.
 data class NoteElement(...) : Element                        // reserved; v1 never creates one
 
 data class BrushSpec(val familyId: String, val size: Float, val colorArgb: Long, val opacity: Float, val epsilon: Float)

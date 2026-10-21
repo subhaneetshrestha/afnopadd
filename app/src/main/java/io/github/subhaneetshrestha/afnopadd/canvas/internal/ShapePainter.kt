@@ -52,7 +52,13 @@ internal class ShapePainter {
             }
         }
         val scale = transform.scale.toFloat()
-        matrix.setScale(scale, scale)
+        // Rectangles and ellipses turn about their box centre; lines and arrows store turned endpoints.
+        if (shape.rotationDeg != 0f) {
+            matrix.setRotate(shape.rotationDeg, (start.x + end.x) / 2, (start.y + end.y) / 2)
+            matrix.postScale(scale, scale)
+        } else {
+            matrix.setScale(scale, scale)
+        }
         matrix.postTranslate(transform.translateX.toFloat(), transform.translateY.toFloat())
         path.transform(matrix)
         paint.strokeJoin = if (shape.shape == ShapeKind.RECTANGLE) Paint.Join.MITER else Paint.Join.ROUND

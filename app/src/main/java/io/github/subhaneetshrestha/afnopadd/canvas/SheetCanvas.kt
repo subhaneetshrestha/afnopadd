@@ -68,6 +68,7 @@ fun SheetCanvas(
     secondPointerConstrains: Boolean = false,
     selectionOutline: WorldRect? = null,
     marquee: WorldRect? = null,
+    selectionHandles: Boolean = false,
 ) {
     val constrains by rememberUpdatedState(secondPointerConstrains)
     // The gesture handler restarts when its role function changes, which would cut a stroke short;
@@ -137,7 +138,10 @@ fun SheetCanvas(
                     // A tool's live preview (a shape being dragged) draws exactly like the element it will become.
                     if (previewElements.isNotEmpty()) dryLayer.draw(composeCanvas.nativeCanvas, previewElements, emptySet(), camera, viewport)
                 }
-                selectionOutline?.let { drawSelectionRect(it, camera, viewport, filled = false) }
+                selectionOutline?.let {
+                    drawSelectionRect(it, camera, viewport, filled = false)
+                    if (selectionHandles) drawSelectionHandles(it, camera, viewport)
+                }
                 marquee?.let { drawSelectionRect(it, camera, viewport, filled = true) }
                 // The dry layer now draws everything the tool committed; Ink's copies can go after this frame.
                 router.releaseAfterDraw()
@@ -165,7 +169,7 @@ fun SheetCanvas(
 private fun DrawScope.drawSelectionRect(rect: WorldRect, camera: Camera, viewport: Viewport, filled: Boolean) {
     val topLeft = CanvasMath.worldToScreen(camera, viewport, WorldPoint(rect.left, rect.top))
     val bottomRight = CanvasMath.worldToScreen(camera, viewport, WorldPoint(rect.right, rect.bottom))
-    val pad = if (filled) 0f else SELECTION_PAD_DP.dp.toPx()
+    val pad = if (filled) 0f else SelectionHandles.PAD_DP.dp.toPx()
     val origin = Offset(topLeft.x.toFloat() - pad, topLeft.y.toFloat() - pad)
     val size = Size((bottomRight.x - topLeft.x).toFloat() + 2 * pad, (bottomRight.y - topLeft.y).toFloat() + 2 * pad)
     if (filled) drawRect(SELECTION_COLOR.copy(alpha = 0.12f), origin, size)
@@ -173,8 +177,23 @@ private fun DrawScope.drawSelectionRect(rect: WorldRect, camera: Camera, viewpor
     drawRect(SELECTION_COLOR, origin, size, style = Stroke(width = 1.5.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(dash, dash / 2))))
 }
 
+/** The scale and rotate handles, at the positions [SelectionHandles] gives the select tool, the same size at every zoom. */
+private fun DrawScope.drawSelectionHandles(bounds: WorldRect, camera: Camera, viewport: Viewport) {
+    fun screenOf(handle: SelectionHandles.Handle): Offset {
+        val p = CanvasMath.worldToScreen(camera, viewport, SelectionHandles.position(handle, bounds, camera.zoom, density))
+        return Offset(p.x.toFloat(), p.y.toFloat())
+    }
+    val rotate = screenOf(SelectionHandles.Handle.ROTATE)
+    val outlineTop = rotate.y + SelectionHandles.ROTATE_OFFSET_DP.dp.toPx()
+    drawLine(SELECTION_COLOR, rotate, Offset(rotate.x, outlineTop), strokeWidth = 1.5.dp.toPx())
+    val radius = SelectionHandles.RADIUS_DP.dp.toPx()
+    for (centre in listOf(rotate, screenOf(SelectionHandles.Handle.SCALE))) {
+        drawCircle(Color.White, radius, centre)
+        drawCircle(SELECTION_COLOR, radius, centre, style = Stroke(width = 2.dp.toPx()))
+    }
+}
+
 private val SELECTION_COLOR = Color(0xFF1E6FD9)
-private const val SELECTION_PAD_DP = 6
 
 private fun visibleRect(camera: Camera, viewport: Viewport): WorldRect {
     val topLeft = CanvasMath.screenToWorld(camera, viewport, ScreenPoint(0.0, 0.0))

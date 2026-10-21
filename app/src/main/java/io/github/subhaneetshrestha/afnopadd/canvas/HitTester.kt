@@ -118,7 +118,7 @@ class SheetHitTester(
         val b = FrameLevels.worldToLocal(to, shape.anchor, shape.frameLevel)
         val reach = radius * 10.0.pow(shape.frameLevel) + shape.style.strokeWidth / 2.0
         // The same outline the painter draws, arrowheads included.
-        return ShapeOutline.segments(shape.shape, shape.geometry.start, shape.geometry.end, shape.style.strokeWidth).any { s ->
+        return ShapeOutline.segments(shape.shape, shape.geometry.start, shape.geometry.end, shape.style.strokeWidth, shape.rotationDeg).any { s ->
             HitGeometry.segmentToSegment(
                 s.start.x.toDouble(), s.start.y.toDouble(), s.end.x.toDouble(), s.end.y.toDouble(),
                 a.x.toDouble(), a.y.toDouble(), b.x.toDouble(), b.y.toDouble(),

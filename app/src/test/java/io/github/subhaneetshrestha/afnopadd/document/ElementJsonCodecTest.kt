@@ -92,6 +92,23 @@ class ElementJsonCodecTest {
     }
 
     @Test
+    fun `a rotated shape round trips its rotation`() {
+        val rotated = shape().copy(shape = ShapeKind.RECTANGLE, rotationDeg = 30f)
+
+        val json = codec.encode(rotated)
+
+        assertEquals(30f, json["rotationDeg"]?.jsonPrimitive?.content?.toFloat())
+        assertEquals(rotated, codec.decode(json) { StrokePoints.EMPTY })
+        assertEquals(rotated, codec.decodePayload(CommonFields.of(rotated), "shape", codec.encodePayload(rotated)) { StrokePoints.EMPTY })
+    }
+
+    @Test
+    fun `an unrotated shape is written exactly as before rotation existed`() {
+        assertEquals(setOf("shape", "geometry", "style"), codec.encodePayload(shape()).keys)
+        assertTrue(codec.decode(codec.encode(shape())) { StrokePoints.EMPTY }.extras.isEmpty())
+    }
+
+    @Test
     fun `image element round trips including a null crop`() {
         val json = codec.encode(image())
 

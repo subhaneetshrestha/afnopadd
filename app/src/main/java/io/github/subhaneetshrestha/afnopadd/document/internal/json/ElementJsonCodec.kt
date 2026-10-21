@@ -107,11 +107,13 @@ class ElementJsonCodec(
 
     private fun specificFields(element: Element): Map<String, JsonElement> = when (element) {
         is StrokeElement -> mapOf(KEY_BRUSH to json.encodeToJsonElement(BrushSpec.serializer(), element.brush))
-        is ShapeElement -> mapOf(
-            KEY_SHAPE to json.encodeToJsonElement(ShapeKind.serializer(), element.shape),
-            KEY_GEOMETRY to json.encodeToJsonElement(ShapeGeometry.serializer(), element.geometry),
-            KEY_STYLE to json.encodeToJsonElement(ShapeStyle.serializer(), element.style),
-        )
+        is ShapeElement -> buildMap {
+            put(KEY_SHAPE, json.encodeToJsonElement(ShapeKind.serializer(), element.shape))
+            put(KEY_GEOMETRY, json.encodeToJsonElement(ShapeGeometry.serializer(), element.geometry))
+            put(KEY_STYLE, json.encodeToJsonElement(ShapeStyle.serializer(), element.style))
+            // Absent when zero, so unrotated shapes are written exactly as before rotation existed.
+            if (element.rotationDeg != 0f) put(KEY_ROTATION_DEG, JsonPrimitive(element.rotationDeg))
+        }
         is ImageElement -> mapOf(
             KEY_ASSET to JsonPrimitive(element.asset.sha256Hex),
             KEY_SIZE to json.encodeToJsonElement(LocalSize.serializer(), element.size),
@@ -154,6 +156,7 @@ class ElementJsonCodec(
                     opacity = it.floatOr("opacity", 1f),
                 )
             },
+            rotationDeg = source.floatOr(KEY_ROTATION_DEG, 0f),
             extras = extras,
         )
         KIND_IMAGE -> ImageElement(
@@ -258,7 +261,7 @@ class ElementJsonCodec(
             KEY_VERSION, KEY_VERSION_NONCE, KEY_CREATED_AT, KEY_UPDATED_AT,
         )
         val STROKE_KEYS = setOf(KEY_BRUSH)
-        val SHAPE_KEYS = setOf(KEY_SHAPE, KEY_GEOMETRY, KEY_STYLE)
+        val SHAPE_KEYS = setOf(KEY_SHAPE, KEY_GEOMETRY, KEY_STYLE, KEY_ROTATION_DEG)
         val IMAGE_KEYS = setOf(KEY_ASSET, KEY_SIZE, KEY_ROTATION_DEG, KEY_CROP)
         val NOTE_KEYS = setOf(KEY_TEXT)
     }

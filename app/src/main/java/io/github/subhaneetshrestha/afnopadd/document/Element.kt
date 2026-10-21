@@ -73,6 +73,11 @@ data class ShapeElement(
     val shape: ShapeKind,
     val geometry: ShapeGeometry,
     val style: ShapeStyle,
+    /**
+     * Clockwise turn about the centre of the geometry's box. Only rectangles and ellipses use it;
+     * a rotated line or arrow stores its rotated endpoints instead. Stored only when non-zero.
+     */
+    val rotationDeg: Float = 0f,
     override val extras: JsonObject = EMPTY_EXTRAS,
 ) : Element
 

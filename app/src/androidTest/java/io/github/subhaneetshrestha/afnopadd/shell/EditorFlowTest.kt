@@ -443,6 +443,55 @@ class EditorFlowTest {
     }
 
     @Test
+    fun theSelectionHandlesScaleAndRotateIt() {
+        val sheet = createSheetAndDraw() // a stroke from (200, 400) to (400, 500) on the canvas, at 1x
+        val session = container.editorSessions.get(sheet.id.value)!!
+        val stroke = session.sheet.snapshot.value.elements.values.single()
+        composeRule.onNodeWithTag(io.github.subhaneetshrestha.afnopadd.tools.ToolbarTags.item("tool:select")).performScrollTo().performClick()
+        composeRule.onNodeWithTag(ShellTags.EDITOR_CANVAS).performTouchInput { click(Offset(300f, 450f)) }
+        composeRule.waitForIdle()
+        val size = composeRule.onNodeWithTag(ShellTags.EDITOR_CANVAS).fetchSemanticsNode().size
+        val viewport = io.github.subhaneetshrestha.afnopadd.canvas.Viewport(size.width, size.height)
+        val density = composeRule.density.density
+        fun handleOnScreen(handle: io.github.subhaneetshrestha.afnopadd.canvas.SelectionHandles.Handle): Offset {
+            val bounds = session.sheet.snapshot.value.elements.values.single().bounds
+            val world = io.github.subhaneetshrestha.afnopadd.canvas.SelectionHandles.position(handle, bounds, camera(sheet).zoom, density)
+            val p = io.github.subhaneetshrestha.afnopadd.canvas.CanvasMath.worldToScreen(camera(sheet), viewport, world)
+            return Offset(p.x.toFloat(), p.y.toFloat())
+        }
+        val centre = Offset(300f, 450f)
+
+        // Drag the scale handle twice as far from the centre.
+        val scaleFrom = handleOnScreen(io.github.subhaneetshrestha.afnopadd.canvas.SelectionHandles.Handle.SCALE)
+        val scaleTo = centre + (scaleFrom - centre) * 2f
+        composeRule.onNodeWithTag(ShellTags.EDITOR_CANVAS).performTouchInput {
+            down(scaleFrom)
+            for (i in 1..10) moveTo(scaleFrom + (scaleTo - scaleFrom) * (i / 10f))
+            up()
+        }
+        composeRule.waitForIdle()
+        val scaled = session.sheet.snapshot.value.elements.values.single()
+        assertEquals(2 * stroke.bounds.width, scaled.bounds.width, stroke.bounds.width * 0.1)
+
+        // Drag the rotate handle a quarter turn clockwise around the centre: from above it to its right.
+        val rotateFrom = handleOnScreen(io.github.subhaneetshrestha.afnopadd.canvas.SelectionHandles.Handle.ROTATE)
+        val radius = centre.y - rotateFrom.y
+        composeRule.onNodeWithTag(ShellTags.EDITOR_CANVAS).performTouchInput {
+            down(rotateFrom)
+            for (i in 1..10) {
+                val angle = Math.toRadians(-90.0 + 9.0 * i)
+                moveTo(Offset(centre.x + radius * kotlin.math.cos(angle).toFloat(), centre.y + radius * kotlin.math.sin(angle).toFloat()))
+            }
+            up()
+        }
+        composeRule.waitForIdle()
+        val turned = session.sheet.snapshot.value.elements.values.single()
+        assertEquals("a quarter turn swaps width and height", scaled.bounds.width, turned.bounds.height, scaled.bounds.width * 0.05)
+        assertEquals(3, turned.version)
+        leaveEditor()
+    }
+
+    @Test
     fun forcingFingerDrawingOverridesASeenStylus() {
         runBlocking { container.settings.update { it.copy(stylusSeen = true, fingerMode = io.github.subhaneetshrestha.afnopadd.tools.FingerMode.DRAW) } }
         val sheet = newSheet()

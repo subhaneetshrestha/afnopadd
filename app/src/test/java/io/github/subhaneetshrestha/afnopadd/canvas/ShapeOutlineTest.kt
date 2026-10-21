@@ -53,4 +53,30 @@ class ShapeOutlineTest {
         val arrow = ShapeOutline.localBounds(ShapeKind.ARROW, LocalPoint(0f, 0f), LocalPoint(100f, 0f), strokeWidth = 2f)
         assertTrue("the arrowhead's spread is outside the bounds", arrow.top < -1f && arrow.bottom > 1f)
     }
+
+    @Test
+    fun `a rotated rectangle turns its corners about the box centre`() {
+        val sides = ShapeOutline.segments(ShapeKind.RECTANGLE, LocalPoint(0f, 0f), LocalPoint(40f, 20f), 1f, rotationDeg = 90f)
+        val corners = sides.map { it.start }
+
+        // A 40 x 20 box centred on (20, 10), turned a quarter, is 20 x 40 about the same centre.
+        assertEquals(10f, corners.minOf { it.x }, 1e-4f)
+        assertEquals(30f, corners.maxOf { it.x }, 1e-4f)
+        assertEquals(-10f, corners.minOf { it.y }, 1e-4f)
+        assertEquals(30f, corners.maxOf { it.y }, 1e-4f)
+        // Clockwise on screen (y down): the start corner (0, 0) goes to the top right.
+        assertEquals(LocalPoint(30f, -10f).x, corners[0].x, 1e-4f)
+        assertEquals(LocalPoint(30f, -10f).y, corners[0].y, 1e-4f)
+    }
+
+    @Test
+    fun `rotated bounds cover the turned shape`() {
+        val rect = ShapeOutline.localBounds(ShapeKind.RECTANGLE, LocalPoint(0f, 0f), LocalPoint(40f, 20f), strokeWidth = 2f, rotationDeg = 90f)
+        assertTrue(rect.left <= 9f && rect.right >= 31f && rect.top <= -11f && rect.bottom >= 31f)
+        assertTrue("not wastefully large", rect.right - rect.left < 26f)
+
+        // A 40 x 20 ellipse turned 90 degrees has a 20 x 40 box.
+        val ellipse = ShapeOutline.localBounds(ShapeKind.ELLIPSE, LocalPoint(0f, 0f), LocalPoint(40f, 20f), strokeWidth = 2f, rotationDeg = 90f)
+        assertEquals(listOf(9f, -11f, 31f, 31f).map { it.toDouble() }, listOf(ellipse.left, ellipse.top, ellipse.right, ellipse.bottom).map { it.toDouble() })
+    }
 }

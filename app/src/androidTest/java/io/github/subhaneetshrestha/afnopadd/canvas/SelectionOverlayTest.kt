@@ -20,6 +20,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import kotlin.math.abs
 
 /** The selection outline and marquee are dashed screen-space rectangles placed by the camera. */
 @RunWith(AndroidJUnit4::class)
@@ -31,17 +32,46 @@ class SelectionOverlayTest {
     private val sheet = SheetImpl(SheetMeta(SheetId("01JAX9Q8K0TZ3M4N5P6R7S8T9V"), "Overlay", 0L, 0L), emptyList(), writer = {})
     private val sink = object : CanvasInputSink { override fun onPointer(event: CanvasPointerEvent) = Unit }
 
-    private fun show(outline: WorldRect?, marquee: WorldRect?, zoom: Double) {
+    private fun show(outline: WorldRect?, marquee: WorldRect?, zoom: Double, handles: Boolean = false, controller: CameraController = CameraController(Camera(WorldPoint(0.0, 0.0), zoom))) {
         rule.setContent {
             val density = LocalDensity.current
             Box(Modifier.size(with(density) { 600.toDp() }, with(density) { 400.toDp() })) {
                 SheetCanvas(
-                    sheet, CameraController(Camera(WorldPoint(0.0, 0.0), zoom)), sink, Modifier.fillMaxSize().testTag("canvas"),
-                    selectionOutline = outline, marquee = marquee,
+                    sheet, controller, sink, Modifier.fillMaxSize().testTag("canvas"),
+                    selectionOutline = outline, marquee = marquee, selectionHandles = handles,
                 )
             }
         }
         rule.waitForIdle()
+    }
+
+    /** The width of the handle ring drawn around [centre], measured along its row. */
+    private fun ringWidthAt(centre: ScreenPoint): Int {
+        val pixels = rule.onNodeWithTag("canvas").captureToImage().toPixelMap()
+        val y = centre.y.toInt()
+        val xs = (centre.x.toInt() - 40..centre.x.toInt() + 40).filter { x -> x in 0 until pixels.width && pixels[x, y].let { it.blue > 0.6f && it.red < 0.5f } }
+        return if (xs.isEmpty()) 0 else xs.last() - xs.first() + 1
+    }
+
+    @Test
+    fun handlesAreTheSameSizeOnScreenAtEveryZoom() {
+        val bounds = WorldRect(-2.0, -1.0, 2.0, 1.0)
+        val controller = CameraController(Camera(WorldPoint(0.0, 0.0), 50.0))
+        show(outline = bounds, marquee = null, zoom = 50.0, handles = true, controller = controller)
+        val density = rule.density.density
+        fun rotateHandleOnScreen() = CanvasMath.worldToScreen(
+            controller.camera.value, Viewport(600, 400),
+            SelectionHandles.position(SelectionHandles.Handle.ROTATE, bounds, controller.camera.value.zoom, density),
+        )
+        val at50x = ringWidthAt(rotateHandleOnScreen())
+
+        rule.runOnUiThread { controller.set(Camera(WorldPoint(0.0, 0.0), 20.0)) }
+        rule.waitForIdle()
+        val at20x = ringWidthAt(rotateHandleOnScreen())
+
+        val expected = 2 * (SelectionHandles.RADIUS_DP + 1) * density
+        assertTrue("ring $at50x px at 50x, expected about $expected", abs(at50x - expected) <= 3)
+        assertTrue("ring $at20x px at 20x, $at50x px at 50x", abs(at20x - at50x) <= 1)
     }
 
     /** Counts bluish pixels along a horizontal run, where the dashed edge crosses. */

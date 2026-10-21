@@ -145,6 +145,22 @@ class ShapeRenderingTest {
     }
 
     @Test
+    fun aRotatedSquareIsDrawnAsADiamond() {
+        // A 100 x 100 square centred on the origin, turned 45 degrees: corners 70.7 px from the centre (300, 200).
+        val square = shape(ShapeKind.RECTANGLE, WorldPoint(-50.0, -50.0), WorldPoint(50.0, 50.0), 4f).copy(
+            rotationDeg = 45f,
+            bounds = WorldRect(-75.0, -75.0, 75.0, 75.0),
+        )
+        showCanvas(listOf(square), CameraController(Camera(WorldPoint(0.0, 0.0), 1.0)))
+
+        val image = capture()
+
+        assertTrue("top corner of the diamond", image.isDark(300, 130))
+        assertTrue("where the unturned top edge was is empty", !image.isDark(300, 150))
+        assertTrue("where the unturned corner was is empty", !image.isDark(252, 152))
+    }
+
+    @Test
     fun previewElementsAreDrawnOverTheSheet() {
         showCanvas(emptyList(), CameraController(Camera(WorldPoint(0.0, 0.0), 1.0)), preview = listOf(shape(ShapeKind.LINE, WorldPoint(-100.0, 0.0), WorldPoint(100.0, 0.0), 4f)))
 

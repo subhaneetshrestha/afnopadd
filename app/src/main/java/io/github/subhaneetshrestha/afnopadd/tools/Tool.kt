@@ -63,7 +63,8 @@ private val NO_MARQUEE: StateFlow<WorldRect?> = MutableStateFlow(null)
 
 /**
  * Everything a tool controller needs; clock and randomness are injectable for deterministic tests.
- * [selection] is shared with the selection commands and the canvas overlay.
+ * [selection] is shared with the selection commands and the canvas overlay. [density] is screen
+ * pixels per dp, for on-screen sizes such as the selection handles.
  */
 class ToolContext(
     val sheet: Sheet,
@@ -74,4 +75,5 @@ class ToolContext(
     val random: Random = Random.Default,
     val ulid: Ulid = Ulid.Default,
     val selection: SelectionState = SelectionState(),
+    val density: Float = 1f,
 )

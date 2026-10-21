@@ -7,6 +7,7 @@ import io.github.subhaneetshrestha.afnopadd.canvas.HitTestFixtures
 import io.github.subhaneetshrestha.afnopadd.canvas.PointerKind
 import io.github.subhaneetshrestha.afnopadd.canvas.PointerPhase
 import io.github.subhaneetshrestha.afnopadd.canvas.ScreenPoint
+import io.github.subhaneetshrestha.afnopadd.canvas.SelectionHandles
 import io.github.subhaneetshrestha.afnopadd.document.ShapeKind
 import io.github.subhaneetshrestha.afnopadd.document.SheetId
 import io.github.subhaneetshrestha.afnopadd.document.SheetMeta
@@ -177,6 +178,72 @@ class SelectToolTest {
 
         assertEquals(setOf(stroke.id), selection.selected.value)
         assertEquals(0, transactions)
+    }
+
+    @Test
+    fun `handles sit a fixed number of screen pixels off the selection at every zoom`() {
+        val bounds = WorldRect(0.0, 0.0, 100.0, 50.0)
+        for (zoom in listOf(0.01, 1.0, 50.0, 20_000.0)) {
+            val scale = SelectionHandles.position(SelectionHandles.Handle.SCALE, bounds, zoom, density = 2f)
+            val rotate = SelectionHandles.position(SelectionHandles.Handle.ROTATE, bounds, zoom, density = 2f)
+            assertEquals("zoom $zoom", SelectionHandles.PAD_DP * 2.0, (scale.x - bounds.right) * zoom, 1e-6)
+            assertEquals("zoom $zoom", SelectionHandles.PAD_DP * 2.0, (scale.y - bounds.bottom) * zoom, 1e-6)
+            assertEquals("zoom $zoom", (SelectionHandles.PAD_DP + SelectionHandles.ROTATE_OFFSET_DP) * 2.0, (bounds.top - rotate.y) * zoom, 1e-6)
+            assertEquals(50.0, rotate.x, 1e-9)
+        }
+    }
+
+    @Test
+    fun `dragging the scale handle away from the centre to twice the distance doubles the selection`() {
+        selection.set(setOf(rectangle.id))
+        // Bounds (99, -1, 201, 101): centre (150, 50), scale handle 6 px beyond the corner at (207, 107).
+        drag(207.0 to 107.0, 264.0 to 164.0)
+
+        assertEquals(1, transactions)
+        val scaled = sheet.snapshot.value.elements.getValue(rectangle.id) as io.github.subhaneetshrestha.afnopadd.document.ShapeElement
+        assertEquals(200f, scaled.geometry.end.x, 1e-3f)
+        assertEquals(4f, scaled.style.strokeWidth, 1e-4f)
+        assertEquals(2, scaled.version)
+        assertEquals(150.0, (scaled.bounds.left + scaled.bounds.right) / 2, 1e-6)
+        sheet.undo()
+        assertEquals(rectangle, sheet.snapshot.value.elements.getValue(rectangle.id))
+    }
+
+    @Test
+    fun `dragging the rotate handle a quarter turn rotates the selection 90 degrees`() {
+        selection.set(setOf(rectangle.id))
+        // The rotate handle sits 34 px above the top-centre (150, -1), at (150, -35); the centre is (150, 50).
+        drag(150.0 to -35.0, 235.0 to 50.0)
+
+        assertEquals(1, transactions)
+        val turned = sheet.snapshot.value.elements.getValue(rectangle.id) as io.github.subhaneetshrestha.afnopadd.document.ShapeElement
+        assertEquals(90f, turned.rotationDeg, 1e-3f)
+        assertEquals(setOf(rectangle.id), selection.selected.value)
+    }
+
+    @Test
+    fun `a rotation near a multiple of 15 degrees snaps to it`() {
+        selection.set(setOf(rectangle.id))
+        // 88 degrees: within the snap of 90.
+        val angle = Math.toRadians(88.0 - 90.0)
+        drag(150.0 to -35.0, (150.0 + 85 * kotlin.math.cos(angle)) to (50.0 + 85 * kotlin.math.sin(angle)))
+
+        val turned = sheet.snapshot.value.elements.getValue(rectangle.id) as io.github.subhaneetshrestha.afnopadd.document.ShapeElement
+        assertEquals(90f, turned.rotationDeg, 1e-3f)
+    }
+
+    @Test
+    fun `a transform is previewed while dragging and commits nothing until the pointer lifts`() {
+        selection.set(setOf(rectangle.id))
+        controller.onPointer(event(PointerPhase.DOWN, 207.0, 107.0, 0L))
+        controller.onPointer(event(PointerPhase.MOVE, 264.0, 164.0, 16L))
+
+        assertEquals(setOf(rectangle.id), controller.hiddenElements.value)
+        assertEquals(1, controller.previewElements.value.size)
+        assertEquals(0, transactions)
+        controller.onPointer(event(PointerPhase.CANCEL, 264.0, 164.0, 32L))
+        assertEquals(0, transactions)
+        assertEquals(rectangle, sheet.snapshot.value.elements.getValue(rectangle.id))
     }
 
     @Test

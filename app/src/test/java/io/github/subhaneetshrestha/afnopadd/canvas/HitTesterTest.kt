@@ -58,6 +58,16 @@ class HitTesterTest {
     }
 
     @Test
+    fun `a rotated rectangle is hit where its turned outline is, not where it was`() {
+        // 100 x 20 centred on (50, 10); turned 90 degrees it runs from y = -40 to 60 at x = 40..60.
+        val upright = HitTestFixtures.shape(1, ShapeKind.RECTANGLE, WorldRect(0.0, 0.0, 100.0, 20.0)).copy(rotationDeg = 90f)
+        val (_, hits) = hitTesterFor(upright.copy(bounds = WorldRect(39.0, -41.0, 61.0, 61.0)))
+
+        assertEquals(listOf(upright.id), hits.elementsAlong(WorldPoint(30.0, -40.0), WorldPoint(70.0, -40.0), radius = 1.0))
+        assertTrue("the old left end is empty now", hits.elementsAlong(WorldPoint(0.0, 5.0), WorldPoint(0.0, 15.0), radius = 1.0).isEmpty())
+    }
+
+    @Test
     fun `lines and arrows are hit along their segment`() {
         val line = HitTestFixtures.shape(1, ShapeKind.LINE, WorldRect(0.0, 0.0, 100.0, 100.0))
         val (_, hits) = hitTesterFor(line)

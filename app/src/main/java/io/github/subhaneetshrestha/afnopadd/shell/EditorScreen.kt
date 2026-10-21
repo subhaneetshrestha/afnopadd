@@ -66,6 +66,7 @@ import io.github.subhaneetshrestha.afnopadd.canvas.CameraAnimator
 import io.github.subhaneetshrestha.afnopadd.canvas.PointerKind
 import io.github.subhaneetshrestha.afnopadd.canvas.PointerRole
 import io.github.subhaneetshrestha.afnopadd.canvas.Viewport
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import kotlinx.coroutines.Job
 import io.github.subhaneetshrestha.afnopadd.tools.options.StrokeOptionsBar
@@ -157,8 +158,9 @@ private fun EditorContent(sheet: Sheet, camera: CameraController, modifier: Modi
     val styles = LocalAppContainer.current.toolStyles
     // One index serves both the canvas's culling and the tools' hit-testing.
     val index = remember(sheet) { ElementIndex() }
-    val toolContext = remember(sheet) {
-        ToolContext(sheet, camera, styles, hitTester = SheetHitTester(sheet, index, StrokeHitTest.ink()))
+    val density = LocalDensity.current.density
+    val toolContext = remember(sheet, density) {
+        ToolContext(sheet, camera, styles, hitTester = SheetHitTester(sheet, index, StrokeHitTest.ink()), density = density)
     }
     val registry = remember {
         ToolRegistry().apply {
@@ -257,6 +259,7 @@ private fun EditorContent(sheet: Sheet, camera: CameraController, modifier: Modi
             secondPointerConstrains = ToolCapability.SHAPE in activeTool.capabilities,
             selectionOutline = selectionOutline,
             marquee = marquee,
+            selectionHandles = ToolCapability.SELECT in activeTool.capabilities,
         )
         // A Surface paints the bars' background and keeps touches on them from reaching the canvas.
         Surface(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(), tonalElevation = 3.dp) {
