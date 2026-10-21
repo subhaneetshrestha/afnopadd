@@ -4,6 +4,7 @@ import android.os.SystemClock
 import android.view.InputDevice
 import android.view.MotionEvent
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
 import io.github.subhaneetshrestha.afnopadd.shell.settings.Settings
 import io.github.subhaneetshrestha.afnopadd.tools.ZoomReadoutTags
@@ -350,6 +351,48 @@ class EditorFlowTest {
 
         assertNotEquals("a finger now pans", before.center, camera(sheet).center)
         assertEquals("and draws nothing", 2, container.editorSessions.get(sheet.id.value)!!.sheet.snapshot.value.elements.size)
+        leaveEditor()
+    }
+
+    /**
+     * Checkpoint C: every v1 tool is reachable from the default toolbar and works with a finger and
+     * with a stylus. Fingers are forced to draw, since in AUTO the first stylus touch makes them pan.
+     */
+    @Test
+    fun everyToolIsReachableFromTheToolbarAndWorksWithFingerAndStylus() {
+        runBlocking { container.settings.update { it.copy(fingerMode = io.github.subhaneetshrestha.afnopadd.tools.FingerMode.DRAW) } }
+        val sheet = newSheet()
+        val elements = { container.editorSessions.get(sheet.id.value)!!.sheet.snapshot.value.elements.size }
+        fun select(toolId: String) {
+            composeRule.onNodeWithTag(io.github.subhaneetshrestha.afnopadd.tools.ToolbarTags.item(toolId)).performScrollTo().performClick()
+            composeRule.waitForIdle()
+            composeRule.onNodeWithTag(io.github.subhaneetshrestha.afnopadd.tools.ToolbarTags.item(toolId)).assertIsSelected()
+        }
+
+        val drawingTools = listOf("tool:pen", "tool:pencil", "tool:brush", "tool:highlighter", "tool:line", "tool:arrow", "tool:rect", "tool:ellipse")
+        for (toolId in drawingTools) {
+            select(toolId)
+            val before = elements()
+            fingerDrag() // (200, 400) to (400, 500)
+            composeRule.waitUntil(timeoutMillis = 5_000) { elements() == before + 1 }
+            stylusDrag(Offset(200f, 700f), Offset(500f, 750f))
+            composeRule.waitUntil(timeoutMillis = 5_000) { elements() == before + 2 }
+        }
+
+        select("tool:eraser")
+        val drawn = elements()
+        composeRule.onNodeWithTag(ShellTags.EDITOR_CANVAS).performTouchInput {
+            down(Offset(300f, 350f))
+            repeat(10) { moveBy(Offset(0f, 20f)) }
+            up()
+        }
+        composeRule.waitUntil(timeoutMillis = 5_000) { elements() < drawn }
+        val afterFinger = elements()
+        stylusDrag(Offset(350f, 650f), Offset(350f, 800f))
+        composeRule.waitUntil(timeoutMillis = 5_000) { elements() < afterFinger }
+
+        // The hand tool's finger and stylus panning is covered by theHandToolPansWithoutChangingTheSheet.
+        select("tool:hand")
         leaveEditor()
     }
 

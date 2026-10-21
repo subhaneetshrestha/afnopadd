@@ -569,9 +569,10 @@ Done 2026-10-21.
 ---
 
 ## Checkpoint C: Every v1 tool usable
-- [ ] All tools reachable from the default toolbar with finger and stylus
-- [ ] State-machine tests for every tool pass; `.\gradlew.bat check` green
+- [x] All tools reachable from the default toolbar with finger and stylus (`EditorFlowTest.everyToolIsReachableFromTheToolbarAndWorksWithFingerAndStylus`: each drawing tool commits with a finger and with real stylus events, the eraser erases with both; the hand tool in `theHandToolPansWithoutChangingTheSheet`)
+- [x] State-machine tests for every tool pass; `.\gradlew.bat check` green (188 unit tests: `StrokeToolTest`, `EraserToolTest`, `ShapeToolTest`, `HandToolTest`, `InputPolicyTest`); full instrumented suite 117/117 on a cold `afnopadd36`, 2026-10-21, no native crash
 - [ ] Owner tries the tool set on both reference devices
+- Select (`tool:select`) is not a v1 tool yet; it arrives in Task 20.
 
 ---
 
