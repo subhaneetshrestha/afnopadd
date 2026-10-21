@@ -10,6 +10,10 @@ object BuiltInTools {
     const val BRUSH = "tool:brush"
     const val HIGHLIGHTER = "tool:highlighter"
     const val ERASER = "tool:eraser"
+    const val LINE = "tool:line"
+    const val ARROW = "tool:arrow"
+    const val RECTANGLE = "tool:rect"
+    const val ELLIPSE = "tool:ellipse"
 }
 
 /** Parameter keys understood by the stroke tool. */
@@ -76,5 +80,9 @@ object BuiltInPresets {
         BuiltInTools.PENCIL to ToolStyle(colorArgb = 0xFF424242, widthPx = 4f),
         BuiltInTools.BRUSH to ToolStyle(colorArgb = 0xFF000000, widthPx = 8f),
         BuiltInTools.HIGHLIGHTER to ToolStyle(colorArgb = 0xFFFFEB3B, widthPx = 16f),
+        BuiltInTools.LINE to ToolStyle(colorArgb = 0xFF000000, widthPx = 3f),
+        BuiltInTools.ARROW to ToolStyle(colorArgb = 0xFF000000, widthPx = 3f),
+        BuiltInTools.RECTANGLE to ToolStyle(colorArgb = 0xFF000000, widthPx = 3f),
+        BuiltInTools.ELLIPSE to ToolStyle(colorArgb = 0xFF000000, widthPx = 3f),
     )
 }

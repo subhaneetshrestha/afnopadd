@@ -9,6 +9,8 @@ import androidx.core.graphics.withMatrix
 import androidx.ink.rendering.android.canvas.CanvasStrokeRenderer
 import io.github.subhaneetshrestha.afnopadd.canvas.internal.BackgroundPainter
 import io.github.subhaneetshrestha.afnopadd.canvas.internal.InkBridge.toAndroidMatrix
+import io.github.subhaneetshrestha.afnopadd.canvas.internal.ShapePainter
+import io.github.subhaneetshrestha.afnopadd.document.ShapeElement
 import io.github.subhaneetshrestha.afnopadd.canvas.internal.StrokeCache
 import io.github.subhaneetshrestha.afnopadd.document.ElementSnapshot
 import io.github.subhaneetshrestha.afnopadd.document.StrokeElement
@@ -28,6 +30,7 @@ class SoftwareRenderer(private val maxBitmapPixels: Long = DEFAULT_MAX_BITMAP_PI
     private val lock = Any()
     private val strokeRenderer = CanvasStrokeRenderer.create()
     private val strokeCache = StrokeCache(maxBytes = 16L * 1024 * 1024)
+    private val shapePainter = ShapePainter()
     private val outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         color = 0xFF9E9E9E.toInt()
@@ -68,6 +71,8 @@ class SoftwareRenderer(private val maxBitmapPixels: Long = DEFAULT_MAX_BITMAP_PI
                 val matrix = CanvasMath.frameToRegion(bounds, scalePxPerUnit, element.anchor, element.frameLevel).toAndroidMatrix()
                 val stroke = strokeCache.strokeFor(element)
                 canvas.withMatrix(matrix) { strokeRenderer.draw(this, stroke, matrix) }
+            } else if (element is ShapeElement) {
+                shapePainter.draw(canvas, element, CanvasMath.frameToRegion(bounds, scalePxPerUnit, element.anchor, element.frameLevel))
             } else {
                 canvas.drawRect(
                     ((element.bounds.left - bounds.left) * scalePxPerUnit).toFloat(),

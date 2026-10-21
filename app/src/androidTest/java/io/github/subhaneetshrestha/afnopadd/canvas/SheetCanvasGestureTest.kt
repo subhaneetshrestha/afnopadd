@@ -53,6 +53,7 @@ class SheetCanvasGestureTest {
         controller: CameraController,
         role: PointerRole = PointerRole.DRAW,
         background: Background = Background.PLAIN,
+        secondPointerConstrains: Boolean = false,
     ): Viewport {
         var viewport = Viewport(0, 0)
         rule.setContent {
@@ -66,6 +67,7 @@ class SheetCanvasGestureTest {
                     background = background,
                     pointerRole = { role },
                     onViewportChanged = { viewport = it },
+                    secondPointerConstrains = secondPointerConstrains,
                 )
             }
         }
@@ -144,6 +146,52 @@ class SheetCanvasGestureTest {
         assertEquals(PointerKind.FINGER, sink.events.first().kind)
         assertTrue(sink.events.all { it.pressure in 0f..1f })
         assertEquals(controller.camera.value, Camera(WorldPoint(5.0, 5.0), zoom = 4.0))
+    }
+
+    @Test
+    fun aSecondPointerDuringAShapeDragConstrainsInsteadOfPinching() {
+        val controller = CameraController(Camera(WorldPoint(0.0, 0.0), zoom = 1.0))
+        showCanvas(controller, secondPointerConstrains = true)
+
+        rule.onNodeWithTag(CANVAS_TAG).performTouchInput {
+            down(0, Offset(100f, 100f))
+            repeat(5) { moveBy(0, Offset(20f, 10f)) }
+            down(1, Offset(400f, 300f))
+            repeat(5) {
+                moveBy(0, Offset(20f, 10f))
+                moveBy(1, Offset(-30f, 0f))
+            }
+            up(0)
+            up(1)
+        }
+        rule.waitForIdle()
+
+        assertEquals("the camera must not move", Camera(WorldPoint(0.0, 0.0), zoom = 1.0), controller.camera.value)
+        val drawing = sink.events.filter { it.pointerId == sink.events.first().pointerId }
+        assertTrue("moves after the second finger are constrained", drawing.any { it.phase == PointerPhase.MOVE && it.constrain })
+        val up = drawing.last()
+        assertEquals(PointerPhase.UP, up.phase)
+        assertTrue("lifting the drawing finger while the modifier is held keeps the constraint", up.constrain)
+        assertTrue("the second finger is not a drawing pointer", sink.events.none { it.pointerId != drawing.first().pointerId })
+    }
+
+    @Test
+    fun aSecondPointerStillPinchesWhenTheToolDoesNotConstrain() {
+        val controller = CameraController(Camera(WorldPoint(0.0, 0.0), zoom = 1.0))
+        showCanvas(controller)
+
+        rule.onNodeWithTag(CANVAS_TAG).performTouchInput {
+            down(0, Offset(100f, 100f))
+            repeat(5) { moveBy(0, Offset(20f, 10f)) }
+            down(1, Offset(400f, 300f))
+            repeat(5) { moveBy(1, Offset(30f, 0f)) }
+            up(0)
+            up(1)
+        }
+        rule.waitForIdle()
+
+        assertTrue("the camera moved", controller.camera.value != Camera(WorldPoint(0.0, 0.0), zoom = 1.0))
+        assertTrue(sink.events.none { it.constrain })
     }
 
     @Test

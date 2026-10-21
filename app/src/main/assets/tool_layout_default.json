@@ -12,6 +12,11 @@
         { "ref": "tool:highlighter" },
         { "ref": "tool:eraser" },
         { "separator": true },
+        { "ref": "tool:line" },
+        { "ref": "tool:arrow" },
+        { "ref": "tool:rect" },
+        { "ref": "tool:ellipse" },
+        { "separator": true },
         { "ref": "cmd:undo" },
         { "ref": "cmd:redo" }
       ]

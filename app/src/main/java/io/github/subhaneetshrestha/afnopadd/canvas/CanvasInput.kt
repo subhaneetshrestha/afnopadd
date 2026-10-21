@@ -20,6 +20,8 @@ data class CanvasPointerEvent(
     val world: WorldPoint,
     val pressure: Float,
     val timeMillis: Long,
+    /** True while a second pointer is held during a gesture whose tool asked for it as a constrain modifier. */
+    val constrain: Boolean = false,
 )
 
 /**

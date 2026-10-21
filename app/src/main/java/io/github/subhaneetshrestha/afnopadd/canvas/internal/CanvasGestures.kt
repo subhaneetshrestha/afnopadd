@@ -24,11 +24,17 @@ import kotlinx.coroutines.CancellationException
  * the policy says [PointerRole.NAVIGATE], pans the camera; a double tap in navigate mode zooms 2x.
  * A stroke in progress is cancelled the moment a second pointer lands or the system cancels the
  * gesture (Compose turns `ACTION_CANCEL` into a synthetic, pre-consumed release event).
+ *
+ * The one exception: when [secondPointerConstrains] says so (shape tools), a second pointer landing
+ * during a drawing gesture is a held modifier instead of a pinch. The drawing pointer keeps going
+ * and its events carry `constrain = true` while another pointer is down (SPEC-drawing-tools
+ * decision 5). Before a drawing gesture starts, two pointers still pinch as usual.
  */
 internal fun Modifier.canvasGestures(
     cameraController: CameraController,
     inputSink: CanvasInputSink,
     pointerRole: (PointerKind) -> PointerRole,
+    secondPointerConstrains: () -> Boolean,
     viewport: () -> Viewport,
 ): Modifier = pointerInput(cameraController, inputSink, pointerRole) {
     val doubleTapTimeoutMillis = viewConfiguration.doubleTapTimeoutMillis
@@ -36,7 +42,7 @@ internal fun Modifier.canvasGestures(
     val touchSlop = viewConfiguration.touchSlop
     var lastTap: Tap? = null
 
-    fun emit(change: PointerInputChange, phase: PointerPhase, position: Offset = change.position) {
+    fun emit(change: PointerInputChange, phase: PointerPhase, position: Offset = change.position, constrain: Boolean = false) {
         val screen = ScreenPoint(position.x.toDouble(), position.y.toDouble())
         inputSink.onPointer(
             CanvasPointerEvent(
@@ -47,6 +53,7 @@ internal fun Modifier.canvasGestures(
                 world = CanvasMath.screenToWorld(cameraController.camera.value, viewport(), screen),
                 pressure = change.pressure.coerceIn(0f, 1f),
                 timeMillis = change.uptimeMillis,
+                constrain = constrain,
             ),
         )
     }
@@ -57,6 +64,7 @@ internal fun Modifier.canvasGestures(
         val drawingPointer = down.id
         var lastDrawingPosition = down.position
         var navigateMoved = false
+        var constrainHeld = false
         if (mode == Mode.DRAWING) emit(down, PointerPhase.DOWN)
         down.consume()
 
@@ -65,7 +73,14 @@ internal fun Modifier.canvasGestures(
                 val event = awaitPointerEvent()
                 val pressed = event.changes.filter { it.pressed }
 
-                if (pressed.size >= 2) {
+                if (pressed.size >= 2 && mode == Mode.DRAWING && secondPointerConstrains()) {
+                    // A held modifier, not a pinch: keep drawing, flagged as constrained.
+                    pressed.firstOrNull { it.id == drawingPointer }?.let { change ->
+                        lastDrawingPosition = change.position
+                        if (change.position != change.previousPosition || !constrainHeld) emit(change, PointerPhase.MOVE, constrain = true)
+                    }
+                    constrainHeld = true
+                } else if (pressed.size >= 2) {
                     if (mode == Mode.DRAWING) emit(down, PointerPhase.CANCEL, lastDrawingPosition)
                     mode = Mode.PINCHING
                     val a = pressed[0]
@@ -88,7 +103,9 @@ internal fun Modifier.canvasGestures(
                     when (mode) {
                         Mode.DRAWING -> if (change.id == drawingPointer) {
                             lastDrawingPosition = change.position
-                            if (change.position != change.previousPosition) emit(change, PointerPhase.MOVE)
+                            // The modifier pointer lifting is a change too: report it even without movement.
+                            if (change.position != change.previousPosition || constrainHeld) emit(change, PointerPhase.MOVE)
+                            constrainHeld = false
                         }
                         Mode.NAVIGATING -> {
                             val delta = change.position - change.previousPosition
@@ -104,7 +121,8 @@ internal fun Modifier.canvasGestures(
                         mode = Mode.FINISHED
                         // A release that arrives already consumed is Compose's synthetic ACTION_CANCEL
                         // (the same rule its own gesture detectors use); a real lift is unconsumed.
-                        emit(release, if (release.isConsumed) PointerPhase.CANCEL else PointerPhase.UP)
+                        val modifierStillDown = event.changes.any { it.id != drawingPointer && it.pressed }
+                        emit(release, if (release.isConsumed) PointerPhase.CANCEL else PointerPhase.UP, constrain = constrainHeld && modifierStillDown)
                     }
                 }
                 event.changes.forEach { it.consume() }

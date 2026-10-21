@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -168,7 +169,7 @@ class EditorFlowTest {
         }
         composeRule.waitUntil(timeoutMillis = 10_000) { strokeCount(sheet) == 0 }
 
-        composeRule.onNodeWithContentDescription(context.getString(R.string.command_undo)).performClick()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.command_undo)).performScrollTo().performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) { strokeCount(sheet) == 1 }
         leaveEditor()
     }
@@ -220,9 +221,38 @@ class EditorFlowTest {
     }
 
     @Test
+    fun theRectangleToolDrawsOneRectangle() {
+        composeRule.onNodeWithTag(LibraryTags.NEW_SHEET).performClick()
+        awaitCanvas()
+        composeRule.waitUntil(timeoutMillis = 5_000) { lastOpened() != null }
+        val sheet = lastOpened()!!
+        // The toolbar scrolls sideways on narrow screens, so bring the button into view first.
+        composeRule.onNodeWithTag(io.github.subhaneetshrestha.afnopadd.tools.ToolbarTags.item("tool:rect")).performScrollTo().performClick()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag(ShellTags.EDITOR_CANVAS).performTouchInput {
+            down(Offset(200f, 400f))
+            moveTo(Offset(300f, 450f))
+            moveTo(Offset(400f, 500f))
+            up()
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { strokeCount(sheet) == 1 }
+        leaveEditor()
+
+        val opened = runBlocking { container.sheetStore.open(sheet.dir) }
+        try {
+            val shape = opened.snapshot.value.elements.values.single() as io.github.subhaneetshrestha.afnopadd.document.ShapeElement
+            assertEquals(io.github.subhaneetshrestha.afnopadd.document.ShapeKind.RECTANGLE, shape.shape)
+            assertEquals(0xFF000000, shape.style.colorArgb)
+        } finally {
+            runBlocking { opened.close() }
+        }
+    }
+
+    @Test
     fun undoRemovesTheStrokeBeforeLeaving() {
         val sheet = createSheetAndDraw()
-        composeRule.onNodeWithContentDescription(context.getString(R.string.command_undo)).performClick()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.command_undo)).performScrollTo().performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) { strokeCount(sheet) == 0 }
         leaveEditor()
 

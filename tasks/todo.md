@@ -515,14 +515,16 @@ Notes: Ink 1.0.0's `ImmutableParallelogram.fromSegmentAndPadding` gives wrong me
 **Description:** Render `ShapeElement`s (line, rectangle, ellipse, arrow with heads scaled to width) through the element matrix, and add the four shape tools with drag-to-create, live overlay preview, and the second-pointer constrain modifier (square, circle, 45-degree lines). No fill.
 
 **Acceptance criteria:**
-- [ ] Each shape tool commits one `ShapeElement` per drag with geometry in frame units and the current colour and thickness.
-- [ ] With the constrain modifier held, rectangles are exact squares and lines snap to 45-degree multiples (unit test on scripted input).
-- [ ] Shapes stay crisp at 50x and hit-test through `HitTester`.
+- [x] Each shape tool commits one `ShapeElement` per drag with geometry in frame units and the current colour and thickness (`ShapeToolTest`; `EditorFlowTest.theRectangleToolDrawsOneRectangle` end to end).
+- [x] With the constrain modifier held, rectangles are exact squares and lines snap to 45-degree multiples (`ShapeToolTest` on scripted input; `SheetCanvasGestureTest` checks that a second finger during a shape drag constrains rather than pinches).
+- [x] Shapes stay crisp at 50x and hit-test through `HitTester` (`ShapeRenderingTest`: a 2-unit line is 100 px wide at 50x with a sharp edge; `HitTesterTest` covers arrowheads; outline geometry is shared in `ShapeOutline`).
 
 **Verification:**
-- [ ] Tests pass: `.\gradlew.bat testDebugUnitTest --tests "*.tools.*"`; screenshot test for rendering in `androidTest`
-- [ ] Build succeeds: `.\gradlew.bat assembleDebug`
-- [ ] Manual check: draw all four shapes
+- [x] Tests pass: `.\gradlew.bat check` (162 unit tests, Lint); full instrumented suite 103/103 on a cold `afnopadd36` (2026-10-21), including `ShapeRenderingTest` (screen vs `SoftwareRenderer` within 1 percent for all four shapes). Mutation checks: dropping the dry-layer shape draw fails all 5 rendering tests; ignoring `secondPointerConstrains` fails the gesture test.
+- [x] Build succeeds: `.\gradlew.bat assembleDebug`
+- [ ] Manual check: draw all four shapes (owner)
+
+Notes: the preview is drawn by `SheetCanvas` from `ToolController.previewElements` after the dry layer, not by a separate overlay file. The second-pointer modifier conflicted with "two pointers always belong to the camera"; resolved in SPEC-canvas-engine decision 9 (only a second pointer that lands after a shape drag starts constrains). With four more tools the default toolbar row is wider than a phone (about 510 dp on a 411 dp screen), so rows now scroll sideways; undo and redo sit past the edge on phones until the layout is revisited.
 
 **Dependencies:** Task 17
 
@@ -532,6 +534,8 @@ Notes: Ink 1.0.0's `ImmutableParallelogram.fromSegmentAndPadding` gives wrong me
 - `app/src/main/assets/tool_layout_default.json`
 
 **Estimated scope:** Medium
+
+Done 2026-10-21.
 
 ---
 

@@ -6,16 +6,11 @@ import io.github.subhaneetshrestha.afnopadd.document.Element
 import io.github.subhaneetshrestha.afnopadd.document.ElementId
 import io.github.subhaneetshrestha.afnopadd.document.LocalPoint
 import io.github.subhaneetshrestha.afnopadd.document.ShapeElement
-import io.github.subhaneetshrestha.afnopadd.document.ShapeKind
 import io.github.subhaneetshrestha.afnopadd.document.Sheet
 import io.github.subhaneetshrestha.afnopadd.document.StrokeElement
 import io.github.subhaneetshrestha.afnopadd.document.WorldPoint
 import io.github.subhaneetshrestha.afnopadd.document.WorldRect
-import kotlin.math.PI
-import kotlin.math.abs
-import kotlin.math.cos
 import kotlin.math.pow
-import kotlin.math.sin
 
 /** Answers "what is under this pointer?" against the elements' drawn geometry, not just their bounds. */
 interface HitTester {
@@ -122,39 +117,12 @@ class SheetHitTester(
         val a = FrameLevels.worldToLocal(from, shape.anchor, shape.frameLevel)
         val b = FrameLevels.worldToLocal(to, shape.anchor, shape.frameLevel)
         val reach = radius * 10.0.pow(shape.frameLevel) + shape.style.strokeWidth / 2.0
-        return outline(shape).any { (p, q) ->
-            HitGeometry.segmentToSegment(p.x, p.y, q.x, q.y, a.x.toDouble(), a.y.toDouble(), b.x.toDouble(), b.y.toDouble()) <= reach
+        // The same outline the painter draws, arrowheads included.
+        return ShapeOutline.segments(shape.shape, shape.geometry.start, shape.geometry.end, shape.style.strokeWidth).any { s ->
+            HitGeometry.segmentToSegment(
+                s.start.x.toDouble(), s.start.y.toDouble(), s.end.x.toDouble(), s.end.y.toDouble(),
+                a.x.toDouble(), a.y.toDouble(), b.x.toDouble(), b.y.toDouble(),
+            ) <= reach
         }
-    }
-
-    /** The shape's outline as line segments in its frame units; arrowheads join when shapes render (Task 18). */
-    private fun outline(shape: ShapeElement): List<Pair<Point, Point>> {
-        val start = Point(shape.geometry.start.x.toDouble(), shape.geometry.start.y.toDouble())
-        val end = Point(shape.geometry.end.x.toDouble(), shape.geometry.end.y.toDouble())
-        return when (shape.shape) {
-            ShapeKind.LINE, ShapeKind.ARROW -> listOf(start to end)
-            ShapeKind.RECTANGLE -> {
-                val corners = listOf(start, Point(end.x, start.y), end, Point(start.x, end.y))
-                corners.indices.map { corners[it] to corners[(it + 1) % corners.size] }
-            }
-            ShapeKind.ELLIPSE -> {
-                val cx = (start.x + end.x) / 2
-                val cy = (start.y + end.y) / 2
-                val rx = abs(end.x - start.x) / 2
-                val ry = abs(end.y - start.y) / 2
-                val ring = (0 until ELLIPSE_SEGMENTS).map {
-                    val angle = 2 * PI * it / ELLIPSE_SEGMENTS
-                    Point(cx + rx * cos(angle), cy + ry * sin(angle))
-                }
-                ring.indices.map { ring[it] to ring[(it + 1) % ring.size] }
-            }
-        }
-    }
-
-    private data class Point(val x: Double, val y: Double)
-
-    private companion object {
-        /** Chord error is under 0.2 % of the radius, far below any stroke width. */
-        const val ELLIPSE_SEGMENTS = 64
     }
 }

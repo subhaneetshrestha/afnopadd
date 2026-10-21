@@ -24,6 +24,7 @@ import io.github.subhaneetshrestha.afnopadd.canvas.internal.SharedInkView
 import io.github.subhaneetshrestha.afnopadd.canvas.internal.WetStrokeRouter
 import io.github.subhaneetshrestha.afnopadd.canvas.internal.canvasGestures
 import io.github.subhaneetshrestha.afnopadd.document.BrushSpec
+import io.github.subhaneetshrestha.afnopadd.document.Element
 import io.github.subhaneetshrestha.afnopadd.document.ElementId
 import io.github.subhaneetshrestha.afnopadd.document.Sheet
 import io.github.subhaneetshrestha.afnopadd.document.WorldRect
@@ -34,8 +35,10 @@ import io.github.subhaneetshrestha.afnopadd.document.WorldRect
  * gestures (two pointers to the camera, one pointer per [pointerRole]), draws wet strokes through
  * Jetpack Ink when [wetStrokeBrush] returns a brush, and reports its pixel size through
  * [onViewportChanged]. Only elements the [index] finds in view are drawn, minus [hiddenElements]
- * (a tool's in-gesture preview, such as the eraser's). Shapes and images render as placeholder
- * outlines until their painters land.
+ * (a tool's in-gesture preview, such as the eraser's), with [previewElements] (a shape being
+ * dragged) drawn on top. With [secondPointerConstrains], a second pointer during a drawing gesture
+ * is a constrain modifier rather than a pinch. Strokes draw through Ink, shapes as vector paths;
+ * images render as placeholder outlines until their painter lands.
  */
 @Composable
 fun SheetCanvas(
@@ -49,7 +52,10 @@ fun SheetCanvas(
     onViewportChanged: (Viewport) -> Unit = {},
     index: ElementIndex = remember(sheet) { ElementIndex() },
     hiddenElements: Set<ElementId> = emptySet(),
+    previewElements: List<Element> = emptyList(),
+    secondPointerConstrains: Boolean = false,
 ) {
+    val constrains by rememberUpdatedState(secondPointerConstrains)
     val snapshot by sheet.snapshot.collectAsState()
     val camera by cameraController.camera.collectAsState()
     var viewport by remember { mutableStateOf(Viewport(0, 0)) }
@@ -71,7 +77,7 @@ fun SheetCanvas(
                 viewport = Viewport(size.width, size.height)
                 onViewportChanged(viewport)
             }
-            .canvasGestures(cameraController, router, pointerRole) { viewport },
+            .canvasGestures(cameraController, router, pointerRole, { constrains }) { viewport },
     ) {
         Spacer(
             modifier = Modifier.fillMaxSize().drawBehind {
@@ -81,6 +87,8 @@ fun SheetCanvas(
                 drawIntoCanvas { composeCanvas ->
                     val visible = index.visible(snapshot, visibleRect(camera, viewport))
                     dryLayer.draw(composeCanvas.nativeCanvas, visible, hiddenElements, camera, viewport)
+                    // A tool's live preview (a shape being dragged) draws exactly like the element it will become.
+                    if (previewElements.isNotEmpty()) dryLayer.draw(composeCanvas.nativeCanvas, previewElements, emptySet(), camera, viewport)
                 }
                 // The dry layer now draws everything the tool committed; Ink's copies can go after this frame.
                 router.releaseAfterDraw()

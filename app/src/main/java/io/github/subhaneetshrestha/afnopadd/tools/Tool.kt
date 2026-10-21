@@ -8,6 +8,7 @@ import io.github.subhaneetshrestha.afnopadd.canvas.HitTester
 import io.github.subhaneetshrestha.afnopadd.canvas.SheetHitTester
 import io.github.subhaneetshrestha.afnopadd.canvas.StrokeFrame
 import io.github.subhaneetshrestha.afnopadd.document.BrushSpec
+import io.github.subhaneetshrestha.afnopadd.document.Element
 import io.github.subhaneetshrestha.afnopadd.document.ElementId
 import io.github.subhaneetshrestha.afnopadd.document.Sheet
 import io.github.subhaneetshrestha.afnopadd.document.Ulid
@@ -46,9 +47,13 @@ interface ToolController : CanvasInputSink {
 
     /** Elements the canvas should leave out while a gesture is in progress (the eraser's preview). */
     val hiddenElements: StateFlow<Set<ElementId>> get() = NOTHING_HIDDEN
+
+    /** Elements not yet committed that the canvas draws on top while a gesture is in progress (a shape being dragged). */
+    val previewElements: StateFlow<List<Element>> get() = NO_PREVIEW
 }
 
 private val NOTHING_HIDDEN: StateFlow<Set<ElementId>> = MutableStateFlow(emptySet())
+private val NO_PREVIEW: StateFlow<List<Element>> = MutableStateFlow(emptyList())
 
 /** Everything a tool controller needs; clock and randomness are injectable for deterministic tests. */
 class ToolContext(

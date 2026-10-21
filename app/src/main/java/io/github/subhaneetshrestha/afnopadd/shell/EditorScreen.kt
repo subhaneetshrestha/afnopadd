@@ -51,6 +51,7 @@ import io.github.subhaneetshrestha.afnopadd.tools.ToolbarSpecJson
 import io.github.subhaneetshrestha.afnopadd.tools.ToolbarState
 import io.github.subhaneetshrestha.afnopadd.tools.color.ColorPickerDialog
 import io.github.subhaneetshrestha.afnopadd.tools.eraser.EraserTool
+import io.github.subhaneetshrestha.afnopadd.tools.shape.ShapeTools
 import io.github.subhaneetshrestha.afnopadd.tools.options.StrokeOptionsBar
 import io.github.subhaneetshrestha.afnopadd.tools.presets.BuiltInPresets
 import io.github.subhaneetshrestha.afnopadd.tools.presets.BuiltInTools
@@ -147,6 +148,7 @@ private fun EditorContent(sheet: Sheet, camera: CameraController, modifier: Modi
         ToolRegistry().apply {
             BuiltInPresets.strokeTools.forEach { register(StrokeTool(it)) }
             register(EraserTool())
+            ShapeTools.all.forEach { register(it) }
         }
     }
     // The selected tool survives rotation and process death with the rest of the editor's saved state.
@@ -157,6 +159,7 @@ private fun EditorContent(sheet: Sheet, camera: CameraController, modifier: Modi
     val activeTool = registry.get(activeToolId) ?: registry.get(BuiltInTools.PEN)!!
     val controller = remember(activeTool, toolContext) { activeTool.createController(toolContext) }
     val hiddenElements by controller.hiddenElements.collectAsState()
+    val previewElements by controller.previewElements.collectAsState()
     val styleMap by styles.styles.collectAsState()
     val container = LocalAppContainer.current
     val recentColors by container.recentColors.colors.collectAsState(initial = emptyList())
@@ -189,11 +192,13 @@ private fun EditorContent(sheet: Sheet, camera: CameraController, modifier: Modi
             wetStrokeBrush = controller::wetStrokeBrush,
             index = index,
             hiddenElements = hiddenElements,
+            previewElements = previewElements,
+            secondPointerConstrains = ToolCapability.SHAPE in activeTool.capabilities,
         )
         // A Surface paints the bars' background and keeps touches on them from reaching the canvas.
         Surface(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(), tonalElevation = 3.dp) {
             Column(modifier = Modifier.navigationBarsPadding()) {
-                if (ToolCapability.STROKE in activeTool.capabilities) {
+                if (ToolCapability.STROKE in activeTool.capabilities || ToolCapability.SHAPE in activeTool.capabilities) {
                     val style = styleMap[activeTool.id] ?: styles.styleFor(activeTool.id)
                     StrokeOptionsBar(
                         widthPx = style.widthPx,

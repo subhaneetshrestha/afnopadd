@@ -62,7 +62,7 @@ T1 build plumbing ─┬─ T2 app shell skeleton ──────────
 - [x] Task 16: Colour palette, picker, recents (2026-10-20)
 - [x] Task 16b: Investigate the render-thread crash when leaving the editor (added 2026-10-20; done 2026-10-20, ADR 0003)
 - [x] Task 17: Spatial index, hit-testing, eraser (2026-10-20; device fps check pending)
-- [ ] Task 18: Shape tools and rendering
+- [x] Task 18: Shape tools and rendering
 - [ ] Task 19: Hand tool, zoom commands, finger-mode policy, settings store
 
 ### Checkpoint C: Every v1 tool usable

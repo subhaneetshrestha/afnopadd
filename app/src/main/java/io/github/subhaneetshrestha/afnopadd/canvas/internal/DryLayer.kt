@@ -11,6 +11,7 @@ import io.github.subhaneetshrestha.afnopadd.canvas.CanvasMath
 import io.github.subhaneetshrestha.afnopadd.canvas.Viewport
 import io.github.subhaneetshrestha.afnopadd.document.Element
 import io.github.subhaneetshrestha.afnopadd.document.ElementId
+import io.github.subhaneetshrestha.afnopadd.document.ShapeElement
 import io.github.subhaneetshrestha.afnopadd.document.StrokeElement
 import io.github.subhaneetshrestha.afnopadd.document.StrokePoints
 import io.github.subhaneetshrestha.afnopadd.document.WorldPoint
@@ -49,6 +50,8 @@ internal class DryLayer(
         strokeWidth = 1f
     }
 
+    private val shapePainter = ShapePainter()
+
     /** Reused for every element: the canvas and Ink's renderer read it during the call only. */
     private val matrix = Matrix()
 
@@ -73,6 +76,8 @@ internal class DryLayer(
                     val stroke = cache.strokeFor(element)
                     canvas.withMatrix(matrix) { renderer.draw(this, stroke, matrix) }
                 }
+            } else if (element is ShapeElement) {
+                shapePainter.draw(canvas, element, CanvasMath.frameToScreen(camera, viewport, element.anchor, element.frameLevel))
             } else {
                 val topLeft = CanvasMath.worldToScreen(camera, viewport, WorldPoint(element.bounds.left, element.bounds.top))
                 val bottomRight = CanvasMath.worldToScreen(camera, viewport, WorldPoint(element.bounds.right, element.bounds.bottom))

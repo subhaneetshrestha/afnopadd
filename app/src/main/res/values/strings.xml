@@ -37,6 +37,10 @@
     <string name="tool_brush">Brush</string>
     <string name="tool_highlighter">Highlighter</string>
     <string name="tool_eraser">Eraser</string>
+    <string name="tool_line">Line</string>
+    <string name="tool_arrow">Arrow</string>
+    <string name="tool_rectangle">Rectangle</string>
+    <string name="tool_ellipse">Ellipse</string>
     <string name="command_undo">Undo</string>
     <string name="command_redo">Redo</string>
 </resources>

@@ -67,6 +67,18 @@ class HitTesterTest {
     }
 
     @Test
+    fun `an arrow is hit on its head, not only its shaft`() {
+        // Shaft along y = 0 to x = 100, 2 units wide; the head strokes spread about 3.8 units off it.
+        val arrow = HitTestFixtures.shape(1, ShapeKind.ARROW, WorldRect(0.0, 0.0, 100.0, 0.0))
+            .let { it.copy(bounds = WorldRect(-1.0, -5.0, 101.0, 5.0)) }
+        val (_, hits) = hitTesterFor(arrow)
+
+        // At x = 96 the upper head stroke passes y ≈ 2.2; the shaft's ink ends at y = 1.
+        assertEquals(listOf(arrow.id), hits.elementsAlong(WorldPoint(96.0, 2.0), WorldPoint(96.0, 2.4), radius = 0.05))
+        assertTrue(hits.elementsAlong(WorldPoint(50.0, 2.0), WorldPoint(50.0, 2.4), radius = 0.05).isEmpty())
+    }
+
+    @Test
     fun `elementAt returns the top-most hit within the screen tolerance`() {
         val below = HitTestFixtures.line(1, WorldPoint(0.0, 0.0), WorldPoint(100.0, 0.0), z = "a1")
         val above = HitTestFixtures.line(2, WorldPoint(50.0, -50.0), WorldPoint(50.0, 50.0), z = "a2")
