@@ -7,6 +7,7 @@
       "placement": "bottom",
       "items": [
         { "ref": "tool:hand" },
+        { "ref": "tool:select" },
         { "separator": true },
         { "ref": "tool:pen" },
         { "ref": "tool:pencil" },

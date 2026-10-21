@@ -48,5 +48,10 @@
     <string name="command_zoom_out">Zoom out</string>
     <string name="command_zoom_fit">Fit to content</string>
     <string name="command_zoom_100">Actual size (100%)</string>
+    <string name="tool_select">Select</string>
+    <string name="command_delete_selection">Delete</string>
+    <string name="command_duplicate_selection">Duplicate</string>
+    <string name="command_bring_to_front">Bring to front</string>
+    <string name="command_send_to_back">Send to back</string>
     <string name="zoom_readout_description">Zoom %1$s, open zoom controls</string>
 </resources>

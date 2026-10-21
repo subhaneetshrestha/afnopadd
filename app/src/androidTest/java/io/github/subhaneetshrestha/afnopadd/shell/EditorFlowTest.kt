@@ -9,6 +9,8 @@ import androidx.compose.ui.test.assertTextEquals
 import io.github.subhaneetshrestha.afnopadd.shell.settings.Settings
 import io.github.subhaneetshrestha.afnopadd.tools.ZoomReadoutTags
 import io.github.subhaneetshrestha.afnopadd.tools.commands.ZoomCommands
+import io.github.subhaneetshrestha.afnopadd.tools.select.SelectionCommands
+import androidx.compose.ui.test.click
 import org.junit.After
 import org.junit.Assert.assertNotEquals
 import org.junit.Before
@@ -393,6 +395,50 @@ class EditorFlowTest {
 
         // The hand tool's finger and stylus panning is covered by theHandToolPansWithoutChangingTheSheet.
         select("tool:hand")
+        leaveEditor()
+    }
+
+    @Test
+    fun theSelectToolSelectsMovesDuplicatesAndDeletes() {
+        val sheet = createSheetAndDraw() // a stroke from (200, 400) to (400, 500) on the canvas, at 1x
+        val session = container.editorSessions.get(sheet.id.value)!!
+        val elements = { session.sheet.snapshot.value.elements }
+        val stroke = elements().values.single()
+        val tag = io.github.subhaneetshrestha.afnopadd.tools.ToolbarTags::item
+        composeRule.onNodeWithTag(tag("tool:select")).performScrollTo().performClick()
+        composeRule.onNodeWithTag(tag(SelectionCommands.DELETE)).assertDoesNotExist()
+
+        composeRule.onNodeWithTag(ShellTags.EDITOR_CANVAS).performTouchInput { click(Offset(300f, 450f)) }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(tag(SelectionCommands.DELETE)).assertIsDisplayed()
+
+        composeRule.onNodeWithTag(ShellTags.EDITOR_CANVAS).performTouchInput {
+            down(Offset(300f, 450f))
+            repeat(10) { moveBy(Offset(10f, 10f)) }
+            up()
+        }
+        composeRule.waitForIdle()
+        val moved = elements().getValue(stroke.id)
+        assertEquals(stroke.anchor.x + 100.0, moved.anchor.x, 1e-6)
+        assertEquals(stroke.anchor.y + 100.0, moved.anchor.y, 1e-6)
+
+        composeRule.onNodeWithTag(tag(SelectionCommands.DUPLICATE)).performClick()
+        composeRule.waitForIdle()
+        assertEquals(2, elements().size)
+
+        // The copy is selected and on top; send it to the back, then delete it.
+        val copy = elements().values.single { it.id != stroke.id }
+        composeRule.onNodeWithTag(tag(SelectionCommands.SEND_TO_BACK)).performClick()
+        composeRule.waitForIdle()
+        assertEquals(copy.id, session.sheet.snapshot.value.ordered.first().id)
+        composeRule.onNodeWithTag(tag(SelectionCommands.DELETE)).performClick()
+        composeRule.waitForIdle()
+        assertEquals(setOf(stroke.id), elements().keys)
+        composeRule.onNodeWithTag(tag(SelectionCommands.DELETE)).assertDoesNotExist()
+
+        composeRule.onNodeWithContentDescription(context.getString(R.string.command_undo)).performScrollTo().performClick()
+        composeRule.waitForIdle()
+        assertEquals(2, elements().size)
         leaveEditor()
     }
 

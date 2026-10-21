@@ -583,14 +583,16 @@ Done 2026-10-21.
 **Description:** Implement the select tool's first half: tap selects the topmost hit element, drag on empty space draws a marquee, long-press adds to the selection, dragging a selection moves it (anchors change, one transaction per gesture), and the context bar with `cmd:delete-selection`, `cmd:duplicate-selection`, `cmd:bring-to-front`, `cmd:send-to-back` using fractional indexes.
 
 **Acceptance criteria:**
-- [ ] Tap, marquee, and long-press-add produce the expected selection sets on a scripted fixture.
-- [ ] Moving a selection of a stroke, a shape, and an image updates all three anchors in one undoable transaction.
-- [ ] Bring to front and send to back reorder only the selected elements' `z` values.
+- [x] Tap, marquee, and long-press-add produce the expected selection sets on a scripted fixture (`SelectToolTest`: topmost hit, empty tap clears, long press toggles, marquee takes only fully enclosed elements, a wobble under 8 px is still a tap).
+- [x] Moving a selection of a stroke, a shape, and an image updates all three anchors in one undoable transaction (`SelectToolTest`; dragging an unselected element selects and moves only it; a cancelled drag commits nothing).
+- [x] Bring to front and send to back reorder only the selected elements' `z` values (`SelectionCommandsTest`, which also covers delete, duplicate with a 16 px offset and new ids, and disabled commands without a selection).
 
 **Verification:**
-- [ ] Tests pass: `.\gradlew.bat testDebugUnitTest --tests "*.tools.select.*"`
-- [ ] Build succeeds: `.\gradlew.bat assembleDebug`
-- [ ] Manual check: select, move, reorder on a device
+- [x] Tests pass: `.\gradlew.bat testDebugUnitTest --tests "*.tools.select.*"` (17); `.\gradlew.bat check` (205, Lint); instrumented `SelectionOverlayTest` (2) and `EditorFlowTest.theSelectToolSelectsMovesDuplicatesAndDeletes`; full suite 120/120 on a cold `afnopadd36`, no native crash. Mutation checks: ignoring the long press, reordering every element, and not drawing the outline each fail a test.
+- [x] Build succeeds: `.\gradlew.bat assembleDebug`
+- [ ] Manual check: select, move, reorder on a device (owner)
+
+Notes: a long press is recognised when the pointer lifts (held 500 ms or more without moving), since tools only see pointer events; there is no feedback at the 500 ms mark yet. A moved selection is previewed with the existing hidden and preview elements, and its outline follows the copies. The context bar is a built-in `ToolbarSpec` rendered by `ToolbarHost`, shown above the toolbars while the select tool has a selection (it floats, so the canvas never resizes, ADR 0003). `Element.withCommon` and `movedBy` edit any element kind's shared fields, including unknown kinds. Leaving the select tool clears the selection; undo and redo drop selected elements that leave the sheet.
 
 **Dependencies:** Task 18
 
@@ -599,6 +601,8 @@ Done 2026-10-21.
 - `app/src/main/assets/tool_layout_default.json`
 
 **Estimated scope:** Medium
+
+Done 2026-10-21.
 
 ---
 

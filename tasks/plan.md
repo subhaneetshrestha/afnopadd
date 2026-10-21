@@ -69,7 +69,7 @@ T1 build plumbing ─┬─ T2 app shell skeleton ──────────
 - [ ] All tools reachable from the default toolbar with finger and stylus; state-machine tests pass; owner tries it on both reference devices
 
 ### Phase 2: Selection, images, deep-zoom performance
-- [ ] Task 20: Select tool: selection, marquee, move, delete, duplicate, z-order
+- [x] Task 20: Select tool: selection, marquee, move, delete, duplicate, z-order
 - [ ] Task 21: Select tool: scale and rotate handles
 - [ ] Task 22: Image import pipeline
 - [ ] Task 23: Image rendering, crop mode, arrange in row

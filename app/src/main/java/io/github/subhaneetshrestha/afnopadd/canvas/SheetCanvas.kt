@@ -15,7 +15,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.unit.dp
+import io.github.subhaneetshrestha.afnopadd.document.WorldPoint
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
@@ -41,7 +48,8 @@ import io.github.subhaneetshrestha.afnopadd.document.WorldRect
  * [onViewportChanged]. Only elements the [index] finds in view are drawn, minus [hiddenElements]
  * (a tool's in-gesture preview, such as the eraser's), with [previewElements] (a shape being
  * dragged) drawn on top. With [secondPointerConstrains], a second pointer during a drawing gesture
- * is a constrain modifier rather than a pinch. Strokes draw through Ink, shapes as vector paths;
+ * is a constrain modifier rather than a pinch. [selectionOutline] and [marquee] are drawn as dashed
+ * screen-space rectangles on top. Strokes draw through Ink, shapes as vector paths;
  * images render as placeholder outlines until their painter lands.
  */
 @Composable
@@ -58,6 +66,8 @@ fun SheetCanvas(
     hiddenElements: Set<ElementId> = emptySet(),
     previewElements: List<Element> = emptyList(),
     secondPointerConstrains: Boolean = false,
+    selectionOutline: WorldRect? = null,
+    marquee: WorldRect? = null,
 ) {
     val constrains by rememberUpdatedState(secondPointerConstrains)
     // The gesture handler restarts when its role function changes, which would cut a stroke short;
@@ -127,6 +137,8 @@ fun SheetCanvas(
                     // A tool's live preview (a shape being dragged) draws exactly like the element it will become.
                     if (previewElements.isNotEmpty()) dryLayer.draw(composeCanvas.nativeCanvas, previewElements, emptySet(), camera, viewport)
                 }
+                selectionOutline?.let { drawSelectionRect(it, camera, viewport, filled = false) }
+                marquee?.let { drawSelectionRect(it, camera, viewport, filled = true) }
                 // The dry layer now draws everything the tool committed; Ink's copies can go after this frame.
                 router.releaseAfterDraw()
             },
@@ -145,6 +157,24 @@ fun SheetCanvas(
         }
     }
 }
+
+/**
+ * A dashed selection rectangle in screen space, so it stays one pixel-crisp line at every zoom;
+ * the selection outline is padded a little so it does not sit on the ink, the marquee is tinted.
+ */
+private fun DrawScope.drawSelectionRect(rect: WorldRect, camera: Camera, viewport: Viewport, filled: Boolean) {
+    val topLeft = CanvasMath.worldToScreen(camera, viewport, WorldPoint(rect.left, rect.top))
+    val bottomRight = CanvasMath.worldToScreen(camera, viewport, WorldPoint(rect.right, rect.bottom))
+    val pad = if (filled) 0f else SELECTION_PAD_DP.dp.toPx()
+    val origin = Offset(topLeft.x.toFloat() - pad, topLeft.y.toFloat() - pad)
+    val size = Size((bottomRight.x - topLeft.x).toFloat() + 2 * pad, (bottomRight.y - topLeft.y).toFloat() + 2 * pad)
+    if (filled) drawRect(SELECTION_COLOR.copy(alpha = 0.12f), origin, size)
+    val dash = 6.dp.toPx()
+    drawRect(SELECTION_COLOR, origin, size, style = Stroke(width = 1.5.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(dash, dash / 2))))
+}
+
+private val SELECTION_COLOR = Color(0xFF1E6FD9)
+private const val SELECTION_PAD_DP = 6
 
 private fun visibleRect(camera: Camera, viewport: Viewport): WorldRect {
     val topLeft = CanvasMath.screenToWorld(camera, viewport, ScreenPoint(0.0, 0.0))

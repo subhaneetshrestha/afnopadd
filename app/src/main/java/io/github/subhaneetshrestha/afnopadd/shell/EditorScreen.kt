@@ -56,6 +56,11 @@ import io.github.subhaneetshrestha.afnopadd.tools.InputPolicy
 import io.github.subhaneetshrestha.afnopadd.tools.ZoomReadout
 import io.github.subhaneetshrestha.afnopadd.tools.commands.ZoomCommands
 import io.github.subhaneetshrestha.afnopadd.tools.hand.HandTool
+import io.github.subhaneetshrestha.afnopadd.tools.select.SelectTool
+import io.github.subhaneetshrestha.afnopadd.tools.select.SelectionCommands
+import io.github.subhaneetshrestha.afnopadd.tools.Placement
+import io.github.subhaneetshrestha.afnopadd.tools.Toolbar
+import io.github.subhaneetshrestha.afnopadd.tools.ToolbarItem
 import io.github.subhaneetshrestha.afnopadd.shell.settings.Settings
 import io.github.subhaneetshrestha.afnopadd.canvas.CameraAnimator
 import io.github.subhaneetshrestha.afnopadd.canvas.PointerKind
@@ -161,6 +166,7 @@ private fun EditorContent(sheet: Sheet, camera: CameraController, modifier: Modi
             register(EraserTool())
             ShapeTools.all.forEach { register(it) }
             register(HandTool())
+            register(SelectTool())
         }
     }
     // The selected tool survives rotation and process death with the rest of the editor's saved state.
@@ -190,7 +196,7 @@ private fun EditorContent(sheet: Sheet, camera: CameraController, modifier: Modi
     }
     // The canvas's size, for zoom commands; not state, since nothing redraws when it changes.
     val viewport = remember { arrayOf(Viewport(0, 0)) }
-    val commands = remember(sheet, camera) {
+    val commands = remember(sheet, camera, toolContext) {
         val animator = CameraAnimator(camera)
         var zoomAnimation: Job? = null
         CommandRegistry().apply {
@@ -205,7 +211,18 @@ private fun EditorContent(sheet: Sheet, camera: CameraController, modifier: Modi
                     zoomAnimation = scope.launch { animator.animateTo(target) }
                 },
             ).all.forEach(::register)
+            SelectionCommands(toolContext).all.forEach(::register)
         }
+    }
+    // An undo or redo can take selected elements off the sheet; they leave the selection with them.
+    LaunchedEffect(toolContext) { sheet.snapshot.collect { toolContext.selection.retainOnly(it.elements.keys) } }
+    val selected by toolContext.selection.selected.collectAsState()
+    val marquee by controller.marquee.collectAsState()
+    val snapshot by sheet.snapshot.collectAsState()
+    // While a selection is dragged its outline follows the moved copies.
+    val selectionOutline = if (selected.isEmpty()) null else {
+        val moved = previewElements.associateBy { it.id }
+        ZoomCommands.boundsOf(selected.mapNotNull { id -> (moved[id] ?: snapshot.elements[id])?.bounds })
     }
     // Asked once per gesture by the canvas: the first stylus touch flips finger mode AUTO to panning, for good.
     var stylusMarked by remember { mutableStateOf(false) }
@@ -238,10 +255,16 @@ private fun EditorContent(sheet: Sheet, camera: CameraController, modifier: Modi
             hiddenElements = hiddenElements,
             previewElements = previewElements,
             secondPointerConstrains = ToolCapability.SHAPE in activeTool.capabilities,
+            selectionOutline = selectionOutline,
+            marquee = marquee,
         )
         // A Surface paints the bars' background and keeps touches on them from reaching the canvas.
         Surface(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(), tonalElevation = 3.dp) {
             Column(modifier = Modifier.navigationBarsPadding()) {
+                // The selection's context bar, rendered from a built-in spec like any toolbar.
+                if (ToolCapability.SELECT in activeTool.capabilities && selected.isNotEmpty()) {
+                    ToolbarHost(spec = SELECTION_BAR, registry = registry, commands = commands, state = toolbarState)
+                }
                 if (ToolCapability.STROKE in activeTool.capabilities || ToolCapability.SHAPE in activeTool.capabilities) {
                     val style = styleMap[activeTool.id] ?: styles.styleFor(activeTool.id)
                     StrokeOptionsBar(
@@ -283,3 +306,9 @@ private fun EditorContent(sheet: Sheet, camera: CameraController, modifier: Modi
 
 private const val DEFAULT_LAYOUT_ASSET = "tool_layout_default.json"
 private const val ZOOM_WIDGET = "widget:zoom"
+
+private val SELECTION_BAR = ToolbarSpec(
+    schemaVersion = 1,
+    source = "builtin",
+    toolbars = listOf(Toolbar(id = "selection", placement = Placement.BOTTOM, items = SelectionCommands.IDS.map { ToolbarItem.Ref(it) })),
+)

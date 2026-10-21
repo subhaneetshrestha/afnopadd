@@ -12,6 +12,8 @@ import io.github.subhaneetshrestha.afnopadd.document.Element
 import io.github.subhaneetshrestha.afnopadd.document.ElementId
 import io.github.subhaneetshrestha.afnopadd.document.Sheet
 import io.github.subhaneetshrestha.afnopadd.document.Ulid
+import io.github.subhaneetshrestha.afnopadd.document.WorldRect
+import io.github.subhaneetshrestha.afnopadd.tools.select.SelectionState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlin.random.Random
@@ -50,12 +52,19 @@ interface ToolController : CanvasInputSink {
 
     /** Elements not yet committed that the canvas draws on top while a gesture is in progress (a shape being dragged). */
     val previewElements: StateFlow<List<Element>> get() = NO_PREVIEW
+
+    /** A selection rectangle the canvas outlines while the tool drags one out. */
+    val marquee: StateFlow<WorldRect?> get() = NO_MARQUEE
 }
 
 private val NOTHING_HIDDEN: StateFlow<Set<ElementId>> = MutableStateFlow(emptySet())
 private val NO_PREVIEW: StateFlow<List<Element>> = MutableStateFlow(emptyList())
+private val NO_MARQUEE: StateFlow<WorldRect?> = MutableStateFlow(null)
 
-/** Everything a tool controller needs; clock and randomness are injectable for deterministic tests. */
+/**
+ * Everything a tool controller needs; clock and randomness are injectable for deterministic tests.
+ * [selection] is shared with the selection commands and the canvas overlay.
+ */
 class ToolContext(
     val sheet: Sheet,
     val camera: CameraController,
@@ -64,4 +73,5 @@ class ToolContext(
     val clock: () -> Long = System::currentTimeMillis,
     val random: Random = Random.Default,
     val ulid: Ulid = Ulid.Default,
+    val selection: SelectionState = SelectionState(),
 )
