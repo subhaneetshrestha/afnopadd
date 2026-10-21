@@ -95,12 +95,14 @@ jobs:
       - name: Build the app and its tests before the emulator starts
         run: ./gradlew assembleDebug assembleDebugAndroidTest --stacktrace
 
-      # The same device as the local test emulator: API 36, Pixel 7.
+      # API 36 on a Pixel 7, as the local test emulator, but the plain AOSP image: the app needs no
+      # Google services, and Play services' background work on google_apis cost the frame-drop
+      # perf test its margin (80 of 1,520 frames, over the emulator's 5 %).
       - name: Run instrumented tests on an API 36 emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 36
-          target: google_apis
+          target: default
           arch: x86_64
           profile: pixel_7
           cores: 4
