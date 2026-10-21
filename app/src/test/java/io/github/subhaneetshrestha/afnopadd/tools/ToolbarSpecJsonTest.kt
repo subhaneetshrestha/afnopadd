@@ -19,7 +19,7 @@ class ToolbarSpecJsonTest {
         assertEquals(listOf("draw", "shapes-and-actions"), spec.toolbars.map { it.id })
         assertTrue(spec.toolbars.all { it.placement == Placement.BOTTOM })
         val items = spec.toolbars.flatMap { it.items }
-        for (id in listOf("tool:hand", "tool:select", "tool:pen", "tool:eraser", "tool:rect", "cmd:undo", "cmd:redo", "widget:zoom")) {
+        for (id in listOf("tool:hand", "tool:select", "tool:pen", "tool:eraser", "tool:rect", "cmd:undo", "cmd:redo", "widget:zoom", "cmd:image-import")) {
             assertTrue("$id missing", ToolbarItem.Ref(id) in items)
         }
         assertTrue("no row over ten items", spec.toolbars.all { it.items.size <= 10 })

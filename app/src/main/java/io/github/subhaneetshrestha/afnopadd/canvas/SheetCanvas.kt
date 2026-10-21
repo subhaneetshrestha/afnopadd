@@ -31,6 +31,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import io.github.subhaneetshrestha.afnopadd.canvas.internal.BackgroundPainter.drawBackground
 import io.github.subhaneetshrestha.afnopadd.canvas.internal.DryLayer
+import io.github.subhaneetshrestha.afnopadd.canvas.internal.ImagePainter
 import io.github.subhaneetshrestha.afnopadd.canvas.internal.InkHost
 import io.github.subhaneetshrestha.afnopadd.canvas.internal.WetStrokeRouter
 import io.github.subhaneetshrestha.afnopadd.canvas.internal.canvasGestures
@@ -49,8 +50,9 @@ import io.github.subhaneetshrestha.afnopadd.document.WorldRect
  * (a tool's in-gesture preview, such as the eraser's), with [previewElements] (a shape being
  * dragged) drawn on top. With [secondPointerConstrains], a second pointer during a drawing gesture
  * is a constrain modifier rather than a pinch. [selectionOutline] and [marquee] are drawn as dashed
- * screen-space rectangles on top. Strokes draw through Ink, shapes as vector paths;
- * images render as placeholder outlines until their painter lands.
+ * screen-space rectangles on top, and [cropFrame] (an image's crop corners in crop mode) with corner
+ * handles. Strokes draw through Ink, shapes as vector paths, images through [imageLoader] (Coil
+ * unless a test supplies its own), at a bitmap size that follows the zoom.
  */
 @Composable
 fun SheetCanvas(
@@ -69,7 +71,10 @@ fun SheetCanvas(
     selectionOutline: WorldRect? = null,
     marquee: WorldRect? = null,
     selectionHandles: Boolean = false,
+    cropFrame: List<WorldPoint>? = null,
+    imageLoader: ImageBitmapLoader? = null,
 ) {
+    val context = LocalContext.current
     val constrains by rememberUpdatedState(secondPointerConstrains)
     // The gesture handler restarts when its role function changes, which would cut a stroke short;
     // hand it one stable function that always asks the latest policy.
@@ -79,7 +84,19 @@ fun SheetCanvas(
     val camera by cameraController.camera.collectAsState()
     var viewport by remember { mutableStateOf(Viewport(0, 0)) }
     var releaseTick by remember { mutableIntStateOf(0) }
-    val dryLayer = remember { DryLayer() }
+    var imageTick by remember { mutableIntStateOf(0) }
+    val loader = imageLoader ?: remember(context) { CoilImageBitmapLoader(context.applicationContext) }
+    val dryLayer = remember(sheet, loader) {
+        DryLayer(
+            imagePainter = ImagePainter(
+                loader = loader,
+                // An in-memory sheet has no asset store; its images stay placeholders.
+                fileFor = { id -> runCatching { sheet.assets.file(id) }.getOrNull() },
+                onLoaded = { imageTick++ },
+            ),
+        )
+    }
+    DisposableEffect(dryLayer) { onDispose { dryLayer.release() } }
     // One router for the canvas's lifetime; it reads the current tool when each gesture starts, so a
     // tool switch never strands a stroke that the previous tool started.
     val currentSink by rememberUpdatedState(inputSink)
@@ -101,7 +118,6 @@ fun SheetCanvas(
     // Jetpack Ink's low-latency wet-stroke layer, borrowed from the activity: it stays attached when
     // the canvas goes, because detaching it right after a stroke crashes Ink 1.0.0 (ADR 0003). It
     // never handles touch itself; the gesture handler feeds it through the router.
-    val context = LocalContext.current
     var privateInk by remember { mutableStateOf(false) }
     DisposableEffect(router, context) {
         val hosted = InkHost.acquire(context)
@@ -131,6 +147,8 @@ fun SheetCanvas(
             modifier = Modifier.fillMaxSize().drawBehind {
                 @Suppress("UNUSED_EXPRESSION")
                 releaseTick // read so a lifted stroke redraws the dry layer even if nothing else changed
+                @Suppress("UNUSED_EXPRESSION")
+                imageTick // read so a bitmap that has just arrived is drawn
                 drawBackground(background, camera, viewport)
                 drawIntoCanvas { composeCanvas ->
                     val visible = index.visible(snapshot, visibleRect(camera, viewport))
@@ -143,6 +161,7 @@ fun SheetCanvas(
                     if (selectionHandles) drawSelectionHandles(it, camera, viewport)
                 }
                 marquee?.let { drawSelectionRect(it, camera, viewport, filled = true) }
+                cropFrame?.let { drawCropFrame(it, camera, viewport) }
                 // The dry layer now draws everything the tool committed; Ink's copies can go after this frame.
                 router.releaseAfterDraw()
             },
@@ -190,6 +209,23 @@ private fun DrawScope.drawSelectionHandles(bounds: WorldRect, camera: Camera, vi
     for (centre in listOf(rotate, screenOf(SelectionHandles.Handle.SCALE))) {
         drawCircle(Color.White, radius, centre)
         drawCircle(SELECTION_COLOR, radius, centre, style = Stroke(width = 2.dp.toPx()))
+    }
+}
+
+/** A crop rectangle, possibly turned with its image: its four corners joined, with a handle on each. */
+private fun DrawScope.drawCropFrame(corners: List<WorldPoint>, camera: Camera, viewport: Viewport) {
+    val points = corners.map { CanvasMath.worldToScreen(camera, viewport, it).let { p -> Offset(p.x.toFloat(), p.y.toFloat()) } }
+    val outline = androidx.compose.ui.graphics.Path().apply {
+        moveTo(points[0].x, points[0].y)
+        points.drop(1).forEach { lineTo(it.x, it.y) }
+        close()
+    }
+    drawPath(outline, Color.White, style = Stroke(width = 3.dp.toPx()))
+    drawPath(outline, SELECTION_COLOR, style = Stroke(width = 1.5.dp.toPx()))
+    val radius = SelectionHandles.RADIUS_DP.dp.toPx()
+    for (corner in points) {
+        drawCircle(Color.White, radius, corner)
+        drawCircle(SELECTION_COLOR, radius, corner, style = Stroke(width = 2.dp.toPx()))
     }
 }
 

@@ -53,5 +53,17 @@
     <string name="command_duplicate_selection">Duplicate</string>
     <string name="command_bring_to_front">Bring to front</string>
     <string name="command_send_to_back">Send to back</string>
+    <string name="command_image_crop">Crop</string>
+    <string name="command_image_reset_crop">Reset crop</string>
+    <string name="command_arrange_row">Arrange in row</string>
+    <string name="command_image_import">Add image</string>
+    <string name="image_import_from_photos">From photos</string>
+    <string name="image_import_from_files">From files</string>
+    <string name="image_import_from_camera">Take a photo</string>
+    <string name="crop_done">Done</string>
     <string name="zoom_readout_description">Zoom %1$s, open zoom controls</string>
+    <plurals name="image_import_failed">
+        <item quantity="one">%1$d of %2$d images could not be added</item>
+        <item quantity="other">%1$d of %2$d images could not be added</item>
+    </plurals>
 </resources>

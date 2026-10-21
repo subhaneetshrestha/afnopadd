@@ -19,6 +19,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTouchInput
@@ -488,6 +489,112 @@ class EditorFlowTest {
         val turned = session.sheet.snapshot.value.elements.values.single()
         assertEquals("a quarter turn swaps width and height", scaled.bounds.width, turned.bounds.height, scaled.bounds.width * 0.05)
         assertEquals(3, turned.version)
+        leaveEditor()
+    }
+
+    /** Puts a 200 x 100 picture into the open sheet as an image element at [at] (world units, 1x), and returns it. */
+    private fun addImage(sheet: SheetSummary, at: io.github.subhaneetshrestha.afnopadd.document.WorldPoint): io.github.subhaneetshrestha.afnopadd.document.ImageElement {
+        val session = container.editorSessions.get(sheet.id.value)!!
+        val picture = android.graphics.Bitmap.createBitmap(200, 100, android.graphics.Bitmap.Config.ARGB_8888).apply { eraseColor(android.graphics.Color.RED) }
+        val bytes = java.io.ByteArrayOutputStream().also { picture.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
+        val asset = runBlocking { session.sheet.assets.put(bytes.inputStream(), "image/png", 200, 100) }
+        val size = io.github.subhaneetshrestha.afnopadd.document.LocalSize(200f, 100f)
+        val image = io.github.subhaneetshrestha.afnopadd.document.ImageElement(
+            id = io.github.subhaneetshrestha.afnopadd.document.ElementId(io.github.subhaneetshrestha.afnopadd.document.Ulid.Default.next()),
+            anchor = at, frameLevel = 0,
+            z = io.github.subhaneetshrestha.afnopadd.document.FractionalIndex.between(session.sheet.snapshot.value.ordered.lastOrNull()?.z, null),
+            bounds = io.github.subhaneetshrestha.afnopadd.tools.select.Transforms.imageBounds(at, 0, size, 0f),
+            version = 1, versionNonce = 1, createdAt = 1L, updatedAt = 1L,
+            asset = asset, size = size, rotationDeg = 0f, crop = null,
+        )
+        composeRule.runOnIdle { session.sheet.transact("Add image") { add(image) } }
+        return image
+    }
+
+    /** Where world point [p] is on the editor's canvas. */
+    private fun onCanvas(sheet: SheetSummary, p: io.github.subhaneetshrestha.afnopadd.document.WorldPoint): Offset {
+        val size = composeRule.onNodeWithTag(ShellTags.EDITOR_CANVAS).fetchSemanticsNode().size
+        val screen = io.github.subhaneetshrestha.afnopadd.canvas.CanvasMath.worldToScreen(camera(sheet), io.github.subhaneetshrestha.afnopadd.canvas.Viewport(size.width, size.height), p)
+        return Offset(screen.x.toFloat(), screen.y.toFloat())
+    }
+
+    @Test
+    fun theAddImageButtonOffersPhotosFilesAndCamera() {
+        newSheet()
+        composeRule.onNodeWithTag(io.github.subhaneetshrestha.afnopadd.tools.ToolbarTags.item(io.github.subhaneetshrestha.afnopadd.images.commands.ImageCommands.IMPORT)).performScrollTo().performClick()
+
+        composeRule.onNodeWithTag(io.github.subhaneetshrestha.afnopadd.images.ImageImportTags.DIALOG).assertIsDisplayed()
+        for (source in listOf(io.github.subhaneetshrestha.afnopadd.images.ImageSource.PhotoPicker, io.github.subhaneetshrestha.afnopadd.images.ImageSource.Documents, io.github.subhaneetshrestha.afnopadd.images.ImageSource.Camera)) {
+            composeRule.onNodeWithTag(io.github.subhaneetshrestha.afnopadd.images.ImageImportTags.source(source)).assertIsDisplayed()
+        }
+        composeRule.onNodeWithText(context.getString(android.R.string.cancel)).performClick()
+        composeRule.onNodeWithTag(io.github.subhaneetshrestha.afnopadd.images.ImageImportTags.DIALOG).assertDoesNotExist()
+        leaveEditor()
+    }
+
+    @Test
+    fun anImageCanBeCroppedAndTheCropReset() {
+        val sheet = newSheet()
+        val image = addImage(sheet, io.github.subhaneetshrestha.afnopadd.document.WorldPoint(-100.0, -50.0))
+        val session = container.editorSessions.get(sheet.id.value)!!
+        val tag = io.github.subhaneetshrestha.afnopadd.tools.ToolbarTags::item
+        val commands = io.github.subhaneetshrestha.afnopadd.images.commands.ImageCommands
+        composeRule.onNodeWithTag(tag("tool:select")).performScrollTo().performClick()
+        composeRule.onNodeWithTag(ShellTags.EDITOR_CANVAS).performTouchInput { click(onCanvas(sheet, io.github.subhaneetshrestha.afnopadd.document.WorldPoint(0.0, 0.0))) }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag(tag(commands.CROP)).performScrollTo().performClick()
+        composeRule.onNodeWithTag(tag(commands.CROP_DONE)).assertIsDisplayed()
+        // Drag the top-left corner a quarter of the way in (the crop stays above its 24 dp minimum).
+        val from = onCanvas(sheet, io.github.subhaneetshrestha.afnopadd.document.WorldPoint(-100.0, -50.0))
+        val to = onCanvas(sheet, io.github.subhaneetshrestha.afnopadd.document.WorldPoint(-50.0, -25.0))
+        composeRule.onNodeWithTag(ShellTags.EDITOR_CANVAS).performTouchInput {
+            down(from)
+            for (i in 1..10) moveTo(from + (to - from) * (i / 10f))
+            up()
+        }
+        composeRule.waitForIdle()
+        val cropped = session.sheet.snapshot.value.elements.getValue(image.id) as io.github.subhaneetshrestha.afnopadd.document.ImageElement
+        assertEquals(50f, cropped.crop!!.left, 1f)
+        assertEquals(25f, cropped.crop!!.top, 1f)
+        composeRule.onNodeWithTag(tag(commands.CROP_DONE)).performClick()
+        composeRule.waitForIdle()
+
+        // Still selected: the context bar is back, and reset shows the whole image again.
+        composeRule.onNodeWithTag(tag(commands.RESET_CROP)).performScrollTo().performClick()
+        composeRule.waitForIdle()
+        val reset = session.sheet.snapshot.value.elements.getValue(image.id) as io.github.subhaneetshrestha.afnopadd.document.ImageElement
+        assertEquals(null, reset.crop)
+        leaveEditor()
+    }
+
+    @Test
+    fun selectedImagesArrangeInARow() {
+        val sheet = newSheet()
+        val left = addImage(sheet, io.github.subhaneetshrestha.afnopadd.document.WorldPoint(-200.0, -200.0))
+        val right = addImage(sheet, io.github.subhaneetshrestha.afnopadd.document.WorldPoint(50.0, 100.0))
+        val session = container.editorSessions.get(sheet.id.value)!!
+        val tag = io.github.subhaneetshrestha.afnopadd.tools.ToolbarTags::item
+        composeRule.onNodeWithTag(tag("tool:select")).performScrollTo().performClick()
+        // Select both with a marquee around them.
+        val from = onCanvas(sheet, io.github.subhaneetshrestha.afnopadd.document.WorldPoint(-230.0, -230.0))
+        val to = onCanvas(sheet, io.github.subhaneetshrestha.afnopadd.document.WorldPoint(280.0, 230.0))
+        composeRule.onNodeWithTag(ShellTags.EDITOR_CANVAS).performTouchInput {
+            down(from)
+            for (i in 1..10) moveTo(from + (to - from) * (i / 10f))
+            up()
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag(tag(io.github.subhaneetshrestha.afnopadd.images.commands.ImageCommands.ARRANGE_ROW)).performScrollTo().performClick()
+        composeRule.waitForIdle()
+
+        val elements = session.sheet.snapshot.value.elements
+        val a = elements.getValue(left.id).bounds
+        val b = elements.getValue(right.id).bounds
+        assertEquals(left.bounds, a)
+        assertEquals(16.0 * composeRule.density.density / camera(sheet).zoom, b.left - a.right, 1e-6)
+        assertEquals((a.top + a.bottom) / 2, (b.top + b.bottom) / 2, 1e-6)
         leaveEditor()
     }
 

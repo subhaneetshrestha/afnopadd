@@ -58,7 +58,20 @@ import io.github.subhaneetshrestha.afnopadd.tools.commands.ZoomCommands
 import io.github.subhaneetshrestha.afnopadd.tools.hand.HandTool
 import io.github.subhaneetshrestha.afnopadd.tools.select.SelectTool
 import io.github.subhaneetshrestha.afnopadd.tools.select.SelectionCommands
-import io.github.subhaneetshrestha.afnopadd.tools.Placement
+import io.github.subhaneetshrestha.afnopadd.tools.select.Transforms
+import io.github.subhaneetshrestha.afnopadd.images.ImageImportHost
+import io.github.subhaneetshrestha.afnopadd.images.ImageImportState
+import io.github.subhaneetshrestha.afnopadd.images.Placement
+import io.github.subhaneetshrestha.afnopadd.images.commands.ImageCommands
+import io.github.subhaneetshrestha.afnopadd.images.crop.CropController
+import io.github.subhaneetshrestha.afnopadd.images.crop.CropMath
+import io.github.subhaneetshrestha.afnopadd.document.ElementId
+import io.github.subhaneetshrestha.afnopadd.document.ImageElement
+import io.github.subhaneetshrestha.afnopadd.canvas.CanvasMath
+import io.github.subhaneetshrestha.afnopadd.canvas.FrameLevels
+import io.github.subhaneetshrestha.afnopadd.canvas.ScreenPoint
+import kotlinx.coroutines.flow.MutableStateFlow
+import io.github.subhaneetshrestha.afnopadd.tools.Placement as BarPlacement
 import io.github.subhaneetshrestha.afnopadd.tools.Toolbar
 import io.github.subhaneetshrestha.afnopadd.tools.ToolbarItem
 import io.github.subhaneetshrestha.afnopadd.shell.settings.Settings
@@ -178,6 +191,11 @@ private fun EditorContent(sheet: Sheet, camera: CameraController, modifier: Modi
     LaunchedEffect(activeToolId) { savedToolId = activeToolId }
     val activeTool = registry.get(activeToolId) ?: registry.get(BuiltInTools.PEN)!!
     val controller = remember(activeTool, toolContext) { activeTool.createController(toolContext) }
+    // Crop mode, entered from the selection's context bar, takes the canvas input from the select tool.
+    var croppingId by remember(sheet) { mutableStateOf<ElementId?>(null) }
+    val cropController = remember(croppingId, toolContext) { croppingId?.let { CropController(toolContext, it) } }
+    DisposableEffect(cropController) { onDispose { cropController?.onDeactivated() } }
+    LaunchedEffect(activeToolId) { if (activeToolId != BuiltInTools.SELECT) croppingId = null }
     val hiddenElements by controller.hiddenElements.collectAsState()
     val previewElements by controller.previewElements.collectAsState()
     val styleMap by styles.styles.collectAsState()
@@ -198,6 +216,7 @@ private fun EditorContent(sheet: Sheet, camera: CameraController, modifier: Modi
     }
     // The canvas's size, for zoom commands; not state, since nothing redraws when it changes.
     val viewport = remember { arrayOf(Viewport(0, 0)) }
+    val imageImport = remember { ImageImportState() }
     val commands = remember(sheet, camera, toolContext) {
         val animator = CameraAnimator(camera)
         var zoomAnimation: Job? = null
@@ -214,6 +233,9 @@ private fun EditorContent(sheet: Sheet, camera: CameraController, modifier: Modi
                 },
             ).all.forEach(::register)
             SelectionCommands(toolContext).all.forEach(::register)
+            ImageCommands(toolContext, scope, onCrop = { croppingId = it.id }).all.forEach(::register)
+            register(Command(ImageCommands.IMPORT, R.string.command_image_import, R.drawable.ic_image_add, MutableStateFlow(true)) { imageImport.choosing = true })
+            register(Command(ImageCommands.CROP_DONE, R.string.crop_done, R.drawable.ic_done, MutableStateFlow(true)) { croppingId = null })
         }
     }
     // An undo or redo can take selected elements off the sheet; they leave the selection with them.
@@ -226,6 +248,12 @@ private fun EditorContent(sheet: Sheet, camera: CameraController, modifier: Modi
         val moved = previewElements.associateBy { it.id }
         ZoomCommands.boundsOf(selected.mapNotNull { id -> (moved[id] ?: snapshot.elements[id])?.bounds })
     }
+    // In crop mode the whole image is shown under the crop frame; leaving it (or the image going) ends the mode.
+    val croppedImage = croppingId?.let { snapshot.elements[it] as? ImageElement }
+    LaunchedEffect(croppingId, croppedImage == null) { if (croppingId != null && croppedImage == null) croppingId = null }
+    val pendingCrop = cropController?.pendingCrop?.collectAsState()?.value
+    val cropFrame = croppedImage?.let { CropMath.cornersInWorld(it, pendingCrop ?: CropMath.visible(it)) }
+    val uncropped = croppedImage?.let { it.copy(crop = null, bounds = Transforms.imageBounds(it.anchor, it.frameLevel, it.size, it.rotationDeg)) }
     // Asked once per gesture by the canvas: the first stylus touch flips finger mode AUTO to panning, for good.
     var stylusMarked by remember { mutableStateOf(false) }
     val pointerRole: (PointerKind) -> PointerRole = { kind ->
@@ -247,25 +275,47 @@ private fun EditorContent(sheet: Sheet, camera: CameraController, modifier: Modi
         SheetCanvas(
             sheet = sheet,
             cameraController = camera,
-            inputSink = controller,
+            inputSink = cropController ?: controller,
             modifier = Modifier.fillMaxSize().statusBarsPadding().testTag(ShellTags.EDITOR_CANVAS),
             background = settings.defaultBackground,
             pointerRole = pointerRole,
             wetStrokeBrush = controller::wetStrokeBrush,
             onViewportChanged = { viewport[0] = it },
             index = index,
-            hiddenElements = hiddenElements,
-            previewElements = previewElements,
+            hiddenElements = if (croppedImage != null) setOf(croppedImage.id) else hiddenElements,
+            previewElements = if (uncropped != null) listOf(uncropped) else previewElements,
             secondPointerConstrains = ToolCapability.SHAPE in activeTool.capabilities,
-            selectionOutline = selectionOutline,
+            selectionOutline = selectionOutline.takeIf { croppedImage == null },
             marquee = marquee,
             selectionHandles = ToolCapability.SELECT in activeTool.capabilities,
+            cropFrame = cropFrame,
+        )
+        ImageImportHost(
+            state = imageImport,
+            sheet = sheet,
+            placement = {
+                val vp = viewport[0]
+                val cam = camera.camera.value
+                Placement(
+                    center = CanvasMath.screenToWorld(cam, vp, ScreenPoint(vp.centerX, vp.centerY)),
+                    frameLevel = FrameLevels.levelFor(cam.zoom),
+                    shortSideWorld = minOf(vp.widthPx, vp.heightPx) / cam.zoom,
+                    gapWorld = ImageCommands.GAP_DP * density / cam.zoom,
+                )
+            },
+            onImported = { ids ->
+                // The new images arrive selected, ready to move, scale or crop.
+                toolbarState.select(BuiltInTools.SELECT)
+                toolContext.selection.set(ids.toSet())
+            },
         )
         // A Surface paints the bars' background and keeps touches on them from reaching the canvas.
         Surface(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(), tonalElevation = 3.dp) {
             Column(modifier = Modifier.navigationBarsPadding()) {
                 // The selection's context bar, rendered from a built-in spec like any toolbar.
-                if (ToolCapability.SELECT in activeTool.capabilities && selected.isNotEmpty()) {
+                if (croppedImage != null) {
+                    ToolbarHost(spec = CROP_BAR, registry = registry, commands = commands, state = toolbarState)
+                } else if (ToolCapability.SELECT in activeTool.capabilities && selected.isNotEmpty()) {
                     ToolbarHost(spec = SELECTION_BAR, registry = registry, commands = commands, state = toolbarState)
                 }
                 if (ToolCapability.STROKE in activeTool.capabilities || ToolCapability.SHAPE in activeTool.capabilities) {
@@ -313,5 +363,17 @@ private const val ZOOM_WIDGET = "widget:zoom"
 private val SELECTION_BAR = ToolbarSpec(
     schemaVersion = 1,
     source = "builtin",
-    toolbars = listOf(Toolbar(id = "selection", placement = Placement.BOTTOM, items = SelectionCommands.IDS.map { ToolbarItem.Ref(it) })),
+    toolbars = listOf(
+        Toolbar(
+            id = "selection",
+            placement = BarPlacement.BOTTOM,
+            items = SelectionCommands.IDS.map { ToolbarItem.Ref(it) } + ToolbarItem.Separator + ImageCommands.IDS.map { ToolbarItem.Ref(it) },
+        ),
+    ),
+)
+
+private val CROP_BAR = ToolbarSpec(
+    schemaVersion = 1,
+    source = "builtin",
+    toolbars = listOf(Toolbar(id = "crop", placement = BarPlacement.BOTTOM, items = listOf(ToolbarItem.Ref(ImageCommands.CROP_DONE)))),
 )

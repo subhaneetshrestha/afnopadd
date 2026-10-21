@@ -11,6 +11,7 @@ import io.github.subhaneetshrestha.afnopadd.canvas.CanvasMath
 import io.github.subhaneetshrestha.afnopadd.canvas.Viewport
 import io.github.subhaneetshrestha.afnopadd.document.Element
 import io.github.subhaneetshrestha.afnopadd.document.ElementId
+import io.github.subhaneetshrestha.afnopadd.document.ImageElement
 import io.github.subhaneetshrestha.afnopadd.document.ShapeElement
 import io.github.subhaneetshrestha.afnopadd.document.StrokeElement
 import io.github.subhaneetshrestha.afnopadd.document.StrokePoints
@@ -19,8 +20,8 @@ import kotlin.math.max
 
 /**
  * Draws committed elements onto the screen canvas: strokes through Ink with each element's exact
- * frame transform, other kinds as placeholder outlines until their painters land. Used from the
- * UI thread only.
+ * frame transform, shapes as paths, images through the [ImagePainter], and anything else (notes,
+ * unknown kinds) as a placeholder outline. Used from the UI thread only.
  *
  * A stroke smaller than [SKETCH_MAX_PX] on screen is drawn as a short cached polyline instead of
  * its Ink mesh. At that size the two look the same, and it keeps a zoomed-out sheet from pushing
@@ -31,6 +32,8 @@ import kotlin.math.max
 internal class DryLayer(
     private val renderer: CanvasStrokeRenderer = CanvasStrokeRenderer.create(),
     val cache: StrokeCache = StrokeCache(),
+    /** Draws images; without one they are placeholder outlines. */
+    private val imagePainter: ImagePainter? = null,
 ) {
     private class Sketch(val points: StrokePoints, val brushKey: Any, val path: Path, val color: Int)
 
@@ -59,6 +62,7 @@ internal class DryLayer(
 
     fun draw(canvas: Canvas, elements: List<Element>, hidden: Set<ElementId>, camera: Camera, viewport: Viewport) {
         cache.beginFrame()
+        imagePainter?.beginFrame()
         for (element in elements) {
             if (element.id in hidden) continue
             if (element is StrokeElement) {
@@ -78,12 +82,19 @@ internal class DryLayer(
                 }
             } else if (element is ShapeElement) {
                 shapePainter.draw(canvas, element, CanvasMath.frameToScreen(camera, viewport, element.anchor, element.frameLevel))
+            } else if (element is ImageElement && imagePainter != null) {
+                imagePainter.draw(canvas, element, CanvasMath.frameToScreen(camera, viewport, element.anchor, element.frameLevel))
             } else {
                 val topLeft = CanvasMath.worldToScreen(camera, viewport, WorldPoint(element.bounds.left, element.bounds.top))
                 val bottomRight = CanvasMath.worldToScreen(camera, viewport, WorldPoint(element.bounds.right, element.bounds.bottom))
                 canvas.drawRect(topLeft.x.toFloat(), topLeft.y.toFloat(), bottomRight.x.toFloat(), bottomRight.y.toFloat(), outlinePaint)
             }
         }
+    }
+
+    /** Lets go of image bitmaps and loads in flight. */
+    fun release() {
+        imagePainter?.release()
     }
 
     private fun sketchFor(element: StrokeElement): Sketch {

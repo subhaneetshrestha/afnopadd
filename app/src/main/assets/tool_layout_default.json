@@ -13,7 +13,9 @@
         { "ref": "tool:pencil" },
         { "ref": "tool:brush" },
         { "ref": "tool:highlighter" },
-        { "ref": "tool:eraser" }
+        { "ref": "tool:eraser" },
+        { "separator": true },
+        { "ref": "cmd:image-import" }
       ]
     },
     {

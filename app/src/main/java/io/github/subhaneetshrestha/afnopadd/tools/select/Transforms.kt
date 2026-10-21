@@ -105,19 +105,28 @@ object Transforms {
                 val centreLocal = LocalPoint(element.size.width / 2, element.size.height / 2)
                 val anchor = anchorForCentre(turnAboutPivot(centreOf(element.anchor, element.frameLevel, centreLocal)), element.frameLevel, centreLocal)
                 val rotation = normalised(element.rotationDeg + degrees)
-                element.copy(anchor = anchor, rotationDeg = rotation, bounds = imageBounds(anchor, element.frameLevel, element.size, rotation))
+                element.copy(anchor = anchor, rotationDeg = rotation, bounds = imageBounds(anchor, element.frameLevel, element.size, rotation, element.crop))
             }
             is NoteElement, is UnknownElement -> element
         }
     }
 
-    /** The world bounds of an image of [size] whose corner is [anchor], turned [rotationDeg] about its centre. */
-    fun imageBounds(anchor: WorldPoint, frameLevel: Int, size: LocalSize, rotationDeg: Float): WorldRect {
+    /**
+     * The world bounds of the visible part of an image of [size] whose corner is [anchor], turned
+     * [rotationDeg] about its centre: the [crop] rectangle when there is one, else the whole image.
+     */
+    fun imageBounds(anchor: WorldPoint, frameLevel: Int, size: LocalSize, rotationDeg: Float, crop: LocalRect? = null): WorldRect {
         val unit = FrameLevels.worldUnitsPerLocalUnit(frameLevel)
         val radians = Math.toRadians(rotationDeg.toDouble())
         val cx = size.width / 2.0
         val cy = size.height / 2.0
-        val corners = listOf(0.0 to 0.0, size.width.toDouble() to 0.0, size.width.toDouble() to size.height.toDouble(), 0.0 to size.height.toDouble()).map { (x, y) ->
+        val visible = crop ?: LocalRect(0f, 0f, size.width, size.height)
+        val corners = listOf(
+            visible.left.toDouble() to visible.top.toDouble(),
+            visible.right.toDouble() to visible.top.toDouble(),
+            visible.right.toDouble() to visible.bottom.toDouble(),
+            visible.left.toDouble() to visible.bottom.toDouble(),
+        ).map { (x, y) ->
             val dx = x - cx
             val dy = y - cy
             (cx + dx * cos(radians) - dy * sin(radians)) to (cy + dx * sin(radians) + dy * cos(radians))

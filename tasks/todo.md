@@ -666,14 +666,16 @@ Done 2026-10-21 (reference-phone timing pending).
 **Description:** Render `ImageElement`s in `canvas-engine` through Coil 3 requests sized per zoom bucket with hardware bitmaps and bilinear filtering, honouring crop and rotation; add crop mode (adjustable rectangle in image space, stored not applied) and `cmd:arrange-row` for selected images, plus `cmd:image-import` wired into the toolbar.
 
 **Acceptance criteria:**
-- [ ] Images appear at the right place and size at every zoom; zooming out requests smaller bitmaps (verified through Coil's request sizes in a test).
-- [ ] Crop mode stores a rectangle and rendering shows only the cropped area; reset crop restores the full image.
-- [ ] Arrange in row lines up selected images left to right with 16 dp gaps in one transaction.
+- [x] Images appear at the right place and size at every zoom; zooming out requests smaller bitmaps (`ImageRenderingTest`: frame at 1x and 2x; requested sizes 1,024, 256, 64 px going from 4x to 0.05x through an injected loader; `ImageBucketsTest`).
+- [x] Crop mode stores a rectangle and rendering shows only the cropped area; reset crop restores the full image (`CropControllerTest`, `CropMathTest`, `ImageRenderingTest.aCropShowsOnlyTheCroppedPart` through real Coil, `EditorFlowTest.anImageCanBeCroppedAndTheCropReset`).
+- [x] Arrange in row lines up selected images left to right with 16 dp gaps in one transaction (`ImageCommandsTest`, `EditorFlowTest.selectedImagesArrangeInARow`).
 
 **Verification:**
-- [ ] Tests pass: unit tests for crop clamping and arrangement; `connectedDebugAndroidTest` rendering test
-- [ ] Build succeeds: `.\gradlew.bat assembleDebug`
-- [ ] Manual check: import, crop, arrange on a device
+- [x] Tests pass: unit tests for crop clamping and arrangement (`.\gradlew.bat check`, 242, Lint); instrumented `ImageRenderingTest` (4, including a turned image) and `EditorFlowTest` (19, including the "Add image" choice); full suite 142/142 on a cold `afnopadd36`. Mutation checks: no crop clip, no turn, and a fixed bitmap size each fail a rendering test.
+- [x] Build succeeds: `.\gradlew.bat assembleDebug`
+- [ ] Manual check: import, crop, arrange on a device (owner)
+
+Notes: `ImagePainter` keeps one bitmap per asset at the power-of-two bucket of its on-screen size (64 to 4,096 px) and draws the previous one, scaled, until a new size arrives; bitmaps are held within 96 MB, dropping assets not drawn this frame first. Loading goes through `ImageBitmapLoader` (Coil 3 in the app: hardware bitmaps, memory cache keyed on file and size), which tests replace. Crop mode is entered from the selection's context bar (Crop, Reset crop and Arrange in row join it for images); it shows the whole image under a frame with corner handles, a drag inside moves the crop, and Done leaves. A crop never gets below 24 dp on screen; a crop of the whole image is stored as none. "Add image" (`cmd:image-import`, end of the top toolbar row) offers photos, files or camera; imported images arrive selected with the select tool active, and failures are reported in a toast. Not done here: thumbnails and the software renderer still draw images as placeholder outlines; drawing them off screen belongs with image export (Task 27).
 
 **Dependencies:** Task 22, Task 20
 
@@ -683,6 +685,8 @@ Done 2026-10-21 (reference-phone timing pending).
 - `app/src/main/assets/tool_layout_default.json`
 
 **Estimated scope:** Medium
+
+Done 2026-10-21.
 
 ---
 
