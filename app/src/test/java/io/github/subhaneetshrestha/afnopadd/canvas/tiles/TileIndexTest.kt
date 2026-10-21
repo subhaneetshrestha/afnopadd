@@ -13,15 +13,15 @@ import org.junit.Test
 class TileIndexTest {
 
     @Test
-    fun `the tile level is the power of two nearest the zoom, so a tile is never stretched more than 1_41x`() {
+    fun `the tile level is the power of two at or above the zoom, so a tile is only ever shrunk and stays sharp`() {
         assertEquals(0, TileGrid.levelFor(1.0))
-        assertEquals(0, TileGrid.levelFor(1.4))
-        assertEquals(1, TileGrid.levelFor(1.5))
+        assertEquals(1, TileGrid.levelFor(1.01))
+        assertEquals(1, TileGrid.levelFor(2.0))
         assertEquals(-4, TileGrid.levelFor(1.0 / 16))
         assertEquals(-4, TileGrid.levelFor(0.054))
         for (zoom in generateSequence(0.001) { it * 1.17 }.takeWhile { it < 1_000.0 }) {
             val stretch = zoom / TileGrid.scale(TileGrid.levelFor(zoom))
-            assertTrue("zoom $zoom stretches $stretch", stretch in 0.70..1.42)
+            assertTrue("zoom $zoom stretches $stretch", stretch > 0.5 - 1e-9 && stretch <= 1.0 + 1e-9)
         }
     }
 
@@ -96,6 +96,22 @@ class TileIndexTest {
     }
 
     @Test
+    fun `the budget grows to what the screen needs, so a large screen keeps its tiles`() {
+        val store = store(budget = 2 * TILE_BYTES)
+        store.screenBytes = 4 * TILE_BYTES
+        val tiles = (0L until 5L).map { TileKey(0, it, 0) to FakeTile("t$it") }
+
+        store.beginFrame()
+        tiles.take(4).forEach { (key, tile) -> store.put(key, store.request(key)!!, tile) }
+        store.beginFrame()
+        store.put(tiles[4].first, store.request(tiles[4].first)!!, tiles[4].second)
+
+        assertEquals(4 * TILE_BYTES, store.heldBytes)
+        assertTrue(tiles[0].second.released)
+        assertFalse(tiles[1].second.released)
+    }
+
+    @Test
     fun `clearing releases every tile and forgets pending requests`() {
         val store = store()
         val key = TileKey(0, 0, 0)
@@ -112,11 +128,18 @@ class TileIndexTest {
 
     @Test
     fun `tiles are used for crowded or hairline views only`() {
-        assertFalse(TileGrid.shouldTile(visibleElements = 2_000, hairlineStrokes = 0, visibleStrokes = 2_000))
-        assertTrue(TileGrid.shouldTile(visibleElements = 2_001, hairlineStrokes = 0, visibleStrokes = 2_001))
-        assertTrue("most strokes thinner than half a pixel", TileGrid.shouldTile(visibleElements = 300, hairlineStrokes = 160, visibleStrokes = 300))
-        assertFalse(TileGrid.shouldTile(visibleElements = 300, hairlineStrokes = 100, visibleStrokes = 300))
+        assertFalse(TileGrid.shouldTile(visibleElements = TileGrid.MAX_VECTOR_ELEMENTS, hairlineStrokes = 0, visibleStrokes = TileGrid.MAX_VECTOR_ELEMENTS))
+        assertTrue(TileGrid.shouldTile(visibleElements = TileGrid.MAX_VECTOR_ELEMENTS + 1, hairlineStrokes = 0, visibleStrokes = TileGrid.MAX_VECTOR_ELEMENTS + 1))
+        assertTrue("most strokes thinner than half a pixel", TileGrid.shouldTile(visibleElements = 150, hairlineStrokes = 80, visibleStrokes = 150))
+        assertFalse(TileGrid.shouldTile(visibleElements = 150, hairlineStrokes = 50, visibleStrokes = 150))
         assertFalse(TileGrid.shouldTile(visibleElements = 0, hairlineStrokes = 0, visibleStrokes = 0))
+    }
+
+    @Test
+    fun `a view with any stroke magnified past 100x is never tiled, however crowded`() {
+        // Only the vector path draws the finer and rebased deep-zoom meshes.
+        assertFalse(TileGrid.shouldTile(visibleElements = 5_000, hairlineStrokes = 0, visibleStrokes = 5_000, deepStrokes = 1))
+        assertTrue(TileGrid.shouldTile(visibleElements = 5_000, hairlineStrokes = 0, visibleStrokes = 5_000, deepStrokes = 0))
     }
 
     @Test

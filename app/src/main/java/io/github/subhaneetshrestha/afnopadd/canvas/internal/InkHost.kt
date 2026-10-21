@@ -32,6 +32,8 @@ internal object InkHost {
      */
     fun acquire(context: Context): InProgressStrokesView? {
         val activity = context.findActivity() ?: return null
+        // A destroyed activity never sends ON_DESTROY again, so its slot would be held forever.
+        if (activity.lifecycle.currentState == Lifecycle.State.DESTROYED) return null
         val slot = slots.getOrPut(activity) {
             activity.lifecycle.addObserver(
                 LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_DESTROY) slots.remove(activity) },

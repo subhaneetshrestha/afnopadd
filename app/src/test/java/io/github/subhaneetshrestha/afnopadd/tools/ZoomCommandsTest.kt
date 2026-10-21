@@ -38,6 +38,20 @@ class ZoomCommandsTest {
     }
 
     @Test
+    fun `a step taken while the previous one animates builds on its target`() {
+        // An animation that never gets anywhere: the camera stays put while it "runs".
+        val targets = mutableListOf<Camera>()
+        val animating = CommandRegistry().apply {
+            ZoomCommands(camera, { viewport }, { content }, animateTo = { targets += it }, animating = { true }).all.forEach(::register)
+        }
+
+        animating.invoke(ZoomCommands.ZOOM_IN)
+        animating.invoke(ZoomCommands.ZOOM_IN)
+
+        assertEquals(listOf(3.0, 4.5), targets.map { it.zoom })
+    }
+
+    @Test
     fun `zoom steps stop at the zoom limits`() {
         camera.set(Camera(WorldPoint(0.0, 0.0), Camera.MAX_ZOOM))
         commands.invoke(ZoomCommands.ZOOM_IN)

@@ -34,6 +34,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import io.github.subhaneetshrestha.afnopadd.canvas.internal.BackgroundPainter.drawBackground
 import io.github.subhaneetshrestha.afnopadd.canvas.internal.DryLayer
 import io.github.subhaneetshrestha.afnopadd.canvas.internal.ImagePainter
+import androidx.core.graphics.withSave
 import io.github.subhaneetshrestha.afnopadd.canvas.internal.tiles.TileGrid
 import io.github.subhaneetshrestha.afnopadd.canvas.internal.tiles.TileLayer
 import android.app.ActivityManager
@@ -84,6 +85,7 @@ fun SheetCanvas(
     selectionHandles: Boolean = false,
     cropFrame: List<WorldPoint>? = null,
     imageLoader: ImageBitmapLoader? = null,
+    previewTransform: PreviewTransform? = null,
 ) {
     val context = LocalContext.current
     val constrains by rememberUpdatedState(secondPointerConstrains)
@@ -115,6 +117,8 @@ fun SheetCanvas(
         TileLayer(TileGrid.budgetBytes(memoryClass), fileFor = { id -> runCatching { sheet.assets.file(id) }.getOrNull() }, onTileReady = { tileTick++ })
     }
     LocalTileLayerObserver.current?.let { observe -> SideEffect { observe(tiles) } }
+    // Released only when the layer itself is replaced or the canvas goes; a new lifecycle owner just re-registers.
+    DisposableEffect(tiles) { onDispose { tiles.release() } }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(tiles, lifecycle) {
         val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_STOP) tiles.trim() }
@@ -131,7 +135,6 @@ fun SheetCanvas(
         onDispose {
             lifecycle.removeObserver(observer)
             context.applicationContext.unregisterComponentCallbacks(trimmer)
-            tiles.release()
         }
     }
     // One router for the canvas's lifetime; it reads the current tool when each gesture starts, so a
@@ -190,6 +193,9 @@ fun SheetCanvas(
                 tileTick // and a tile
                 drawBackground(background, camera, viewport)
                 drawIntoCanvas { composeCanvas ->
+                    // One frame for every pass below (tiles' vector patches, the dry layer, previews), so
+                    // meshes and bitmaps one pass drew are not evicted by the next.
+                    dryLayer.beginFrame()
                     val visibleRect = visibleRect(camera, viewport)
                     val visible = index.visible(snapshot, visibleRect)
                     tiles.sync(snapshot)
@@ -198,8 +204,24 @@ fun SheetCanvas(
                     } else {
                         dryLayer.draw(composeCanvas.nativeCanvas, visible, hiddenElements, camera, viewport)
                     }
-                    // A tool's live preview (a shape being dragged) draws exactly like the element it will become.
-                    if (previewElements.isNotEmpty()) dryLayer.draw(composeCanvas.nativeCanvas, previewElements, emptySet(), camera, viewport)
+                    // A tool's live preview (a shape being dragged) draws exactly like the element it will
+                    // become; a selection being scaled or turned is drawn under its preview transform.
+                    if (previewElements.isNotEmpty()) {
+                        val native = composeCanvas.nativeCanvas
+                        val transform = previewTransform
+                        if (transform == null) {
+                            dryLayer.draw(native, previewElements, emptySet(), camera, viewport)
+                        } else {
+                            val pivot = CanvasMath.worldToScreen(camera, viewport, transform.pivot)
+                            native.withSave {
+                                translate(pivot.x.toFloat(), pivot.y.toFloat())
+                                rotate(transform.rotationDeg.toFloat())
+                                scale(transform.scale.toFloat(), transform.scale.toFloat())
+                                translate(-pivot.x.toFloat(), -pivot.y.toFloat())
+                                dryLayer.draw(this, previewElements, emptySet(), camera, viewport)
+                            }
+                        }
+                    }
                 }
                 selectionOutline?.let {
                     drawSelectionRect(it, camera, viewport, filled = false)

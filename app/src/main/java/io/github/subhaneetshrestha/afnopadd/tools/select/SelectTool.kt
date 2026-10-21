@@ -18,6 +18,7 @@ import io.github.subhaneetshrestha.afnopadd.tools.presets.BuiltInTools
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import io.github.subhaneetshrestha.afnopadd.canvas.PreviewTransform
 import io.github.subhaneetshrestha.afnopadd.canvas.SelectionHandles
 import io.github.subhaneetshrestha.afnopadd.tools.commands.ZoomCommands
 import kotlin.math.abs
@@ -49,7 +50,7 @@ class SelectTool : Tool {
  * bounds instead: the scale handle scales uniformly by how far the pointer is from the centre
  * compared with where it started, and the rotate handle turns by the change in the pointer's angle
  * around the centre, snapping to multiples of [SNAP_STEP_DEG] within [SNAP_WITHIN_DEG]. Both are
- * previewed like a move and committed as one transaction.
+ * previewed as the untouched elements under a [PreviewTransform] and committed as one transaction.
  */
 class SelectController internal constructor(private val context: ToolContext) : ToolController {
 
@@ -79,6 +80,9 @@ class SelectController internal constructor(private val context: ToolContext) : 
 
     private val _marquee = MutableStateFlow<WorldRect?>(null)
     override val marquee: StateFlow<WorldRect?> = _marquee.asStateFlow()
+
+    private val _previewTransform = MutableStateFlow<PreviewTransform?>(null)
+    override val previewTransform: StateFlow<PreviewTransform?> = _previewTransform.asStateFlow()
 
     override fun onPointer(event: CanvasPointerEvent) {
         if (event.phase == PointerPhase.DOWN) {
@@ -150,9 +154,17 @@ class SelectController internal constructor(private val context: ToolContext) : 
             }
             Mode.MARQUEE -> _marquee.value = rectBetween(gesture.downWorld, event.world)
             Mode.SCALING, Mode.ROTATING -> {
+                // The untouched elements under one canvas transform: their cached meshes are reused
+                // every frame, and the transformed geometry is built once, when the gesture commits.
                 val elements = context.sheet.snapshot.value.elements
+                val pivot = gesture.pivot ?: return
                 hidden.value = selection.selected.value
-                preview.value = selection.selected.value.mapNotNull { id -> elements[id]?.let { transformed(gesture, event, it) } }
+                preview.value = selection.selected.value.mapNotNull { elements[it] }
+                _previewTransform.value = if (gesture.mode == Mode.SCALING) {
+                    PreviewTransform(pivot, scale = scaleFactor(gesture, event))
+                } else {
+                    PreviewTransform(pivot, rotationDeg = rotationDegrees(gesture, event))
+                }
             }
         }
     }
@@ -207,14 +219,14 @@ class SelectController internal constructor(private val context: ToolContext) : 
         }
         if (unchanged) return
         val live = context.sheet.snapshot.value.elements
-        val ids = selection.selected.value.filter { it in live }
-        if (ids.isEmpty()) return
+        // Notes and unknown kinds come back unchanged; they get no new version.
+        val changed = selection.selected.value.mapNotNull { id -> live[id]?.let { it to transformed(gesture, event, it) } }
+            .filter { (before, after) -> after !== before }
+        if (changed.isEmpty()) return
         val now = context.clock()
         context.sheet.transact(label = if (gesture.mode == Mode.SCALING) "Scale" else "Rotate") {
-            for (id in ids) {
-                update(id) { element ->
-                    transformed(gesture, event, element).withCommon(version = element.version + 1, versionNonce = context.random.nextInt(), updatedAt = now)
-                }
+            for ((before, after) in changed) {
+                update(before.id) { after.withCommon(version = before.version + 1, versionNonce = context.random.nextInt(), updatedAt = now) }
             }
         }
     }
@@ -249,6 +261,7 @@ class SelectController internal constructor(private val context: ToolContext) : 
         hidden.value = emptySet()
         preview.value = emptyList()
         _marquee.value = null
+        _previewTransform.value = null
     }
 
     private fun rectBetween(a: WorldPoint, b: WorldPoint) = WorldRect(minOf(a.x, b.x), minOf(a.y, b.y), maxOf(a.x, b.x), maxOf(a.y, b.y))

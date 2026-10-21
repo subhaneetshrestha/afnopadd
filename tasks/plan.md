@@ -74,7 +74,7 @@ T1 build plumbing ─┬─ T2 app shell skeleton ──────────
 - [x] Task 22: Image import pipeline
 - [x] Task 23: Image rendering, crop mode, arrange in row
 - [x] Task 24: Tile pyramid cache and level of detail
-- [ ] Task 25: Deep-zoom hardening and performance fixture
+- [x] Task 25: Deep-zoom hardening and performance fixture
 
 ### Checkpoint D: Performance criteria
 - [ ] Success criteria 1 to 4 of `SPEC.md` measured on both devices and recorded in `docs/checklists/perf-2026.md`

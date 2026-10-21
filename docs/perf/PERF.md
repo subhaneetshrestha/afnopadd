@@ -102,6 +102,19 @@ stayed flat within these loops, so that growth is the emulator's, not the app's.
 |---|---|---|---|
 | Draw crowded or hairline views from 256 px tiles of the nearest power-of-two level, rendered in the background into hardware bitmaps; missing or invalidated tiles drawn as clipped vectors | overview of 5,000 strokes 119 ms → 0.97 ms median (2.7 ms p95) | kept | Closes the "overview is 120 ms" gap above. First frame after a jump still costs the vector draw for the tiles not yet rendered; tiles fill in centre first. Tiles match a direct render (0 of 401 inked cells differ in `TileLayerTest`). |
 
+## 2026-10-21: deep zoom and the performance fixture (Task 25)
+
+Fixture: `PerfFixture` (5,000 strokes plus 20 images). Results per criterion in `docs/checklists/perf-2026.md`.
+
+| Idea | Baseline → result | Verdict | Why |
+|---|---|---|---|
+| Tiles draw strokes smaller than 32 px at the tile's scale as polylines (`RegionPainter(sketchSmallStrokes)`) | pan at 0.03x median 53.8 → 0.94 ms; p95 at 0.001-0.01x 170 → 2-4 ms | kept | The tile thread tessellated every tiny stroke, so tiles arrived seconds late and frames were patched with vectors meanwhile. |
+| Tile threshold 2,000 → 500 visible elements | 0.32x median 24.1 → 22.7 ms | reverted to the next idea | About 330 elements are visible there, below 500 too. |
+| Tile threshold 200 visible elements | 0.32x median 22.7 → 0.68 ms | kept | A mesh stroke costs the UI thread about 65 us on the emulator; 200 bounds the vector path near 13 ms there, less on devices. |
+| Tiles at the level at or above the zoom (shrunk only) instead of the nearest level | 0.32x 0.68 → 9.1 ms median (more tiles to fill); overview 0.97 → 1.75 ms | kept | Dense pages at working zoom now use tiles, and tiles enlarged up to 1.41x blurred stroke edges; shrinking keeps them sharp. |
+| Finer epsilon beyond 100x, clipped rebased variants beyond 10,000x (`DeepZoom`) | cap of a 10,000-unit stroke at 100,000x: 16 px off → on the exact pixel | kept | `DeepZoomRenderingTest` fails without either variant. Shapes and images are rebased near the view at that depth too. |
+| Persistent map for `SheetImpl.apply` (kotlinx.collections.immutable, needs approval) | commit 1.66 ms median at 5,000 strokes | not proposed | Once per gesture, not per frame; revisit past about 30,000 elements. |
+
 ### Guards
 
 `RendererPerfTest` fails if the overview allocates over 2 MB per frame or its median exceeds 400 ms

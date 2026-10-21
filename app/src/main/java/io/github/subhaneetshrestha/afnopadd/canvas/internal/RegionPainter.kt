@@ -32,7 +32,20 @@ internal class RegionPainter(
     private val fileFor: ((AssetId) -> File?)? = null,
     strokeCacheBytes: Long = 16L * 1024 * 1024,
     imageCacheBytes: Int = 16 * 1024 * 1024,
+    /** Draw strokes smaller than [DryLayer.SKETCH_MAX_PX] as polylines, as the screen does (tiles); exports keep every mesh. */
+    private val sketchSmallStrokes: Boolean = false,
+    /**
+     * The largest image decode. Tiles cap it below the 4,096 px store cap: a 256 px tile never needs
+     * more, and one 2,048 px bitmap (16 MB) fits the cache, where a 64 MB one would be decoded again
+     * for every tile it touches.
+     */
+    private val maxImagePx: Int = ImageBuckets.MAX_PX,
 ) {
+    private val sketchPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+    }
     private val strokeRenderer = CanvasStrokeRenderer.create()
     private val strokeCache = StrokeCache(maxBytes = strokeCacheBytes)
     private val shapePainter = ShapePainter()
@@ -60,8 +73,15 @@ internal class RegionPainter(
             when (element) {
                 is StrokeElement -> {
                     val matrix = transform.toAndroidMatrix()
-                    val stroke = strokeCache.strokeFor(element)
-                    canvas.withMatrix(matrix) { strokeRenderer.draw(this, stroke, matrix) }
+                    if (sketchSmallStrokes && max(element.bounds.width, element.bounds.height) * scalePxPerUnit < DryLayer.SKETCH_MAX_PX) {
+                        // Too small for its mesh to show: a polyline looks the same and skips tessellation.
+                        sketchPaint.color = InkBridge.colorIntArgb(element.brush)
+                        sketchPaint.strokeWidth = element.brush.size
+                        canvas.withMatrix(matrix) { drawPath(DryLayer.sketchPath(element.points), sketchPaint) }
+                    } else {
+                        val stroke = strokeCache.strokeFor(element)
+                        canvas.withMatrix(matrix) { strokeRenderer.draw(this, stroke, matrix) }
+                    }
                 }
                 is ShapeElement -> shapePainter.draw(canvas, element, transform)
                 is ImageElement -> drawImage(canvas, element, transform.scale.toFloat(), transform.translateX.toFloat(), transform.translateY.toFloat(), region, scalePxPerUnit)
@@ -107,7 +127,7 @@ internal class RegionPainter(
     /** The image decoded to fit [screenLongEdgePx]'s bucket, or null without a readable file. */
     private fun imageBitmap(image: ImageElement, screenLongEdgePx: Double): Bitmap? {
         val files = fileFor ?: return null
-        val bucket = ImageBuckets.bucketFor(screenLongEdgePx)
+        val bucket = ImageBuckets.bucketFor(screenLongEdgePx).coerceAtMost(maxImagePx)
         val key = "${image.asset.sha256Hex}@$bucket"
         images.get(key)?.let { return it }
         val file = files(image.asset)?.takeIf { it.isFile } ?: return null
@@ -121,6 +141,9 @@ internal class RegionPainter(
                 }
             }
         } catch (e: IOException) {
+            return null
+        } catch (e: RuntimeException) {
+            // Decoders throw unchecked exceptions for corrupt data; the image is drawn as a placeholder.
             return null
         }
         images.put(key, bitmap)

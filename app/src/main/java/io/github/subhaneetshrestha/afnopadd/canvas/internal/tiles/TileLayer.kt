@@ -10,6 +10,7 @@ import io.github.subhaneetshrestha.afnopadd.canvas.Camera
 import io.github.subhaneetshrestha.afnopadd.canvas.CanvasMath
 import io.github.subhaneetshrestha.afnopadd.canvas.FrameLevels
 import io.github.subhaneetshrestha.afnopadd.canvas.Viewport
+import io.github.subhaneetshrestha.afnopadd.canvas.internal.DeepZoom
 import io.github.subhaneetshrestha.afnopadd.canvas.internal.DryLayer
 import io.github.subhaneetshrestha.afnopadd.document.AssetId
 import io.github.subhaneetshrestha.afnopadd.document.Element
@@ -79,16 +80,17 @@ internal class TileLayer(
 
     /** Whether [visible] at [camera] is better drawn from tiles: too many elements, or mostly hairline strokes. */
     fun shouldTile(visible: List<Element>, camera: Camera): Boolean {
-        if (visible.size > TileGrid.MAX_VECTOR_ELEMENTS) return true
         var strokes = 0
         var hairlines = 0
+        var deep = 0
         for (element in visible) {
             if (element !is StrokeElement) continue
             strokes++
-            val px = element.brush.size * camera.zoom * FrameLevels.worldUnitsPerLocalUnit(element.frameLevel)
-            if (px < TileGrid.HAIRLINE_PX) hairlines++
+            val pxPerLocal = camera.zoom * FrameLevels.worldUnitsPerLocalUnit(element.frameLevel)
+            if (element.brush.size * pxPerLocal < TileGrid.HAIRLINE_PX) hairlines++
+            if (pxPerLocal > DeepZoom.FINE_ABOVE) deep++
         }
-        return TileGrid.shouldTile(visible.size, hairlines, strokes)
+        return TileGrid.shouldTile(visible.size, hairlines, strokes, deep)
     }
 
     fun draw(
@@ -105,6 +107,7 @@ internal class TileLayer(
         val level = TileGrid.levelFor(camera.zoom)
         val keys = TileGrid.keysCovering(visibleRect, level)
         wanted = keys.toHashSet()
+        store.screenBytes = keys.size * TILE_BYTES * 3 / 2
         val hiddenBounds = hidden.mapNotNull { snapshot.elements[it]?.bounds }
         val patches = ArrayList<WorldRect>()
         for (key in keys) {
@@ -163,5 +166,6 @@ internal class TileLayer(
     private companion object {
         /** Renders queued at once; a pan replaces what it scrolls past instead of finishing a backlog. */
         const val MAX_QUEUED = 8
+        const val TILE_BYTES = TileGrid.TILE_PX.toLong() * TileGrid.TILE_PX * 4
     }
 }

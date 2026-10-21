@@ -33,19 +33,25 @@ class ToolStyles(private val defaults: Map<String, ToolStyle>) {
 
     fun styleFor(toolId: String): ToolStyle = _styles.value[toolId] ?: FALLBACK
 
+    /** Tools changed in this session, which a late [restore] must not overwrite. */
+    private val changed = mutableSetOf<String>()
+
     fun update(toolId: String, transform: (ToolStyle) -> ToolStyle) {
+        synchronized(changed) { changed += toolId }
         _styles.update { current ->
             val next = transform(current[toolId] ?: FALLBACK)
             current + (toolId to next.copy(widthPx = clampWidth(next.widthPx)))
         }
     }
 
-    /** Lays styles saved by an earlier session over the current ones. */
+    /** Lays styles saved by an earlier session over the defaults, keeping any tool already changed in this one. */
     fun restore(saved: Map<String, ToolStyle>) {
-        _styles.update { current -> current + saved }
+        val keep = synchronized(changed) { changed.toSet() }
+        _styles.update { current -> current + saved.filterKeys { it !in keep } }
     }
 
     fun reset() {
+        synchronized(changed) { changed.clear() }
         _styles.value = defaults
     }
 

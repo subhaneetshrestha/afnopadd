@@ -231,6 +231,7 @@ private fun EditorContent(sheet: Sheet, camera: CameraController, modifier: Modi
                     zoomAnimation?.cancel()
                     zoomAnimation = scope.launch { animator.animateTo(target) }
                 },
+                animating = { zoomAnimation?.isActive == true },
             ).all.forEach(::register)
             SelectionCommands(toolContext).all.forEach(::register)
             ImageCommands(toolContext, scope, onCrop = { croppingId = it.id }).all.forEach(::register)
@@ -244,9 +245,11 @@ private fun EditorContent(sheet: Sheet, camera: CameraController, modifier: Modi
     val marquee by controller.marquee.collectAsState()
     val snapshot by sheet.snapshot.collectAsState()
     // While a selection is dragged its outline follows the moved copies.
+    val previewTransform by controller.previewTransform.collectAsState()
     val selectionOutline = if (selected.isEmpty()) null else {
         val moved = previewElements.associateBy { it.id }
         ZoomCommands.boundsOf(selected.mapNotNull { id -> (moved[id] ?: snapshot.elements[id])?.bounds })
+            ?.let { bounds -> previewTransform?.apply(bounds) ?: bounds }
     }
     // In crop mode the whole image is shown under the crop frame; leaving it (or the image going) ends the mode.
     val croppedImage = croppingId?.let { snapshot.elements[it] as? ImageElement }
@@ -289,6 +292,7 @@ private fun EditorContent(sheet: Sheet, camera: CameraController, modifier: Modi
             marquee = marquee,
             selectionHandles = ToolCapability.SELECT in activeTool.capabilities,
             cropFrame = cropFrame,
+            previewTransform = previewTransform.takeIf { croppedImage == null },
         )
         ImageImportHost(
             state = imageImport,
@@ -308,6 +312,7 @@ private fun EditorContent(sheet: Sheet, camera: CameraController, modifier: Modi
                 toolbarState.select(BuiltInTools.SELECT)
                 toolContext.selection.set(ids.toSet())
             },
+            scope = container.appScope,
         )
         // A Surface paints the bars' background and keeps touches on them from reaching the canvas.
         Surface(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(), tonalElevation = 3.dp) {

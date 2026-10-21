@@ -722,14 +722,16 @@ Done 2026-10-21 (phone fps pending).
 **Description:** Finish the zoom story: re-tessellate strokes at a finer `epsilon` when the relative zoom to their frame exceeds 100x (cached per bucket), clip strokes beyond 1e4 relative zoom, build the shared performance fixture (5,000 strokes, 20 images) under `androidTest`, and add timing tests for criteria 1 to 4 of `SPEC.md` (open time, stroke frame drops, pan/zoom fps, zoom range). Known hotspot from Task 6: `SheetImpl.apply` copies the whole element map per transaction (O(n) allocation per gesture); measure it on the fixture and, if it matters, propose `kotlinx.collections.immutable` (JetBrains, Apache-2.0, needs the owner's dependency approval) for a persistent map with structural sharing.
 
 **Acceptance criteria:**
-- [ ] A stroke drawn at 1x viewed at 100,000x shows smooth edges and does not jitter relative to neighbours (screenshot comparison across two frames).
-- [ ] Opening the fixture takes under 1.5 s to first interactive frame; a 1,000-point stroke on it drops no frames; pan/zoom holds 60 fps at every bucket on both devices.
-- [ ] Results are written to `docs/checklists/perf-2026.md` with device names and dates.
+- [x] A stroke drawn at 1x viewed at 100,000x shows smooth edges and does not jitter relative to neighbours (`DeepZoomRenderingTest`: the cap of a 10,000-unit stroke sits on the exact pixel on every row, and a neighbour drawn at 100,000x keeps its gap across a 64 px pan; without the deep-zoom variants the edge is 16 px off).
+- [ ] Opening the fixture takes under 1.5 s to first interactive frame; a 1,000-point stroke on it drops no frames; pan/zoom holds 60 fps at every bucket on both devices. Emulator (`PerfTest`): 435 ms; 4.1 % of frames one vsync late while drawing; worst 9.1 ms median UI-thread frame across every bucket. Devices pending (owner).
+- [x] Results are written to `docs/checklists/perf-2026.md` with device names and dates (emulator now; device rows pending).
 
 **Verification:**
-- [ ] Tests pass: `.\gradlew.bat connectedDebugAndroidTest` (perf suite)
-- [ ] Build succeeds: `.\gradlew.bat assembleDebug`
-- [ ] Manual check: zoom to the cap and draw
+- [x] Tests pass: perf suite `PerfTest` (3), `DeepZoomRenderingTest`, `TileLayerTest` (5), `RendererPerfTest` (4); `.\gradlew.bat check` (256 unit tests, including `DeepZoomTest`). Mutation checks: without deep-zoom variants, and with only the finer one, the deep-zoom test fails.
+- [x] Build succeeds: `.\gradlew.bat assembleDebug`
+- [ ] Manual check: zoom to the cap and draw (owner)
+
+Notes: measuring the fixture found three tile problems, now fixed (`docs/perf/PERF.md`): tiles tessellated every tiny stroke (now polylines, as on screen), the 2,000-element threshold let 330 mesh strokes cost 22 ms a frame (now 200), and nearest-level tiles blurred when enlarged (now the level at or above the zoom, so they only shrink). The `SheetImpl.apply` map copy costs 1.66 ms per commit at 5,000 strokes, once per gesture, so the persistent-collection dependency is not proposed. The fixture's strokes have 60 points, not the spec's 150. Criterion 2 is close to its emulator allowance (5 %) and needs the device.
 
 **Dependencies:** Task 24
 
@@ -739,6 +741,22 @@ Done 2026-10-21 (phone fps pending).
 - `docs/checklists/perf-2026.md`
 
 **Estimated scope:** Medium
+
+Done 2026-10-21 on the emulator (device numbers pending).
+
+### Review of Tasks 18 to 25 (2026-10-21)
+
+A deep review of `be04bca..HEAD` found no critical issues, seven required changes and some optional ones; all required ones are fixed (263 unit tests, Lint; full instrumented suite 154/154 on a cold `afnopadd36`):
+
+- [x] Images in tiles: decodes capped at 2,048 px with a cache that holds one, and `OutOfMemoryError` and unchecked decoder errors fall back to placeholders or vector patches instead of killing the tile thread.
+- [x] Tiles never draw a view with a stroke past 100x relative zoom; only the vector path draws the deep-zoom variants (`TileIndexTest`).
+- [x] Scaling or rotating a selection previews the untouched elements under one `PreviewTransform`, so meshes are reused instead of rebuilt every move (`SelectToolTest`).
+- [x] An image import runs in the app's scope, so rotation does not cancel it; a cancelled import stops between images and adds none (`ImageImporterTest`).
+- [x] Shared-file input: image size must be finite and positive, turns must be finite, crops are clamped into the image or dropped; crop mode cannot throw on a bad crop (`ElementJsonCodecTest`).
+- [x] A picked source over 200 MB is refused before it fills the cache (`ImageImporterTest`).
+- [x] Deep-zoom stroke variants have a byte budget and are not evicted within the frame that draws them (`DryStrokeRenderingTest`).
+- [x] Optional, fixed: the tile layer is released only with itself, and its rasteriser drops requests after shutdown; one `beginFrame` per frame for every pass; the tile budget never drops below 1.5 screens of tiles (`TileIndexTest`); failed image loads are not retried every frame; `InkHost` ignores a destroyed activity; saved styles no longer overwrite a change made before they load; a notes-only transform commits nothing; a shape preview keeps one id per drag; zoom steps build on an animation's target (`ZoomCommandsTest`).
+- [ ] Left for later: `EditorScreen` recomposes on every drag move and has grown to about 380 lines (split crop and import wiring out); the image draw and rotation math is written in two to three places; thumbnails and exports draw images as placeholders (Task 27); the sketch cut-off differs slightly between tiles and vectors.
 
 ---
 

@@ -5,6 +5,7 @@ import androidx.annotation.StringRes
 import io.github.subhaneetshrestha.afnopadd.canvas.CameraController
 import io.github.subhaneetshrestha.afnopadd.canvas.CanvasInputSink
 import io.github.subhaneetshrestha.afnopadd.canvas.HitTester
+import io.github.subhaneetshrestha.afnopadd.canvas.PreviewTransform
 import io.github.subhaneetshrestha.afnopadd.canvas.SheetHitTester
 import io.github.subhaneetshrestha.afnopadd.canvas.StrokeFrame
 import io.github.subhaneetshrestha.afnopadd.document.BrushSpec
@@ -55,7 +56,12 @@ interface ToolController : CanvasInputSink {
 
     /** A selection rectangle the canvas outlines while the tool drags one out. */
     val marquee: StateFlow<WorldRect?> get() = NO_MARQUEE
+
+    /** A scale and turn the canvas applies to [previewElements] (scaling or rotating a selection). */
+    val previewTransform: StateFlow<PreviewTransform?> get() = NO_PREVIEW_TRANSFORM
 }
+
+private val NO_PREVIEW_TRANSFORM: StateFlow<PreviewTransform?> = MutableStateFlow(null)
 
 private val NOTHING_HIDDEN: StateFlow<Set<ElementId>> = MutableStateFlow(emptySet())
 private val NO_PREVIEW: StateFlow<List<Element>> = MutableStateFlow(emptyList())

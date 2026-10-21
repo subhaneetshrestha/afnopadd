@@ -66,6 +66,7 @@ class TileLayerTest {
             val rect = visibleRect(camera)
             val visible = index.visible(snapshot, rect)
             layer.sync(snapshot)
+            vectors.beginFrame()
             layer.draw(canvas, snapshot, visible, emptySet(), camera, viewport, rect, vectors)
             node.endRecording()
             millis = (System.nanoTime() - start) / 1e6
@@ -104,6 +105,7 @@ class TileLayerTest {
             instrumentation.runOnMainSync {
                 val start = System.nanoTime()
                 val canvas = node.beginRecording()
+                vectors.beginFrame()
                 vectors.draw(canvas, index.visible(snapshot, visibleRect(overview)), emptySet(), overview.copy(center = WorldPoint(overview.center.x + i, overview.center.y)), viewport)
                 node.endRecording()
                 t = (System.nanoTime() - start) / 1e6

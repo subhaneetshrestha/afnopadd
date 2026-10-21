@@ -68,7 +68,8 @@ internal class ShapeController(
     private val context: ToolContext,
 ) : ToolController {
 
-    private class Drag(val pointerId: Long, val start: WorldPoint, val startScreen: ScreenPoint, val level: Int, val localPerPx: Double)
+    /** One drag; its [id] is minted once, so the preview of every move and the committed shape share it. */
+    private class Drag(val pointerId: Long, val start: WorldPoint, val startScreen: ScreenPoint, val level: Int, val localPerPx: Double, val id: ElementId)
 
     private val preview = MutableStateFlow<List<Element>>(emptyList())
     override val previewElements: StateFlow<List<Element>> = preview.asStateFlow()
@@ -80,7 +81,7 @@ internal class ShapeController(
             PointerPhase.DOWN -> {
                 val camera = context.camera.camera.value
                 val level = FrameLevels.levelFor(camera.zoom)
-                drag = Drag(event.pointerId, event.world, event.screen, level, 1.0 / (camera.zoom * FrameLevels.worldUnitsPerLocalUnit(level)))
+                drag = Drag(event.pointerId, event.world, event.screen, level, 1.0 / (camera.zoom * FrameLevels.worldUnitsPerLocalUnit(level)), ElementId(context.ulid.next()))
                 preview.value = emptyList()
             }
             PointerPhase.MOVE -> drag?.takeIf { it.pointerId == event.pointerId }?.let { preview.value = listOfNotNull(shapeFor(it, event)) }
@@ -112,7 +113,7 @@ internal class ShapeController(
         val unit = FrameLevels.worldUnitsPerLocalUnit(drag.level)
         val now = context.clock()
         return ShapeElement(
-            id = ElementId(context.ulid.next()),
+            id = drag.id,
             anchor = drag.start,
             frameLevel = drag.level,
             z = FractionalIndex.between(context.sheet.snapshot.value.ordered.lastOrNull()?.z, null),

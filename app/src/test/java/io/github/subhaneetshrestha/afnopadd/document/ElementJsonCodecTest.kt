@@ -116,6 +116,36 @@ class ElementJsonCodecTest {
         assertEquals(image(), codec.decode(json) { StrokePoints.EMPTY })
     }
 
+    private fun imageJsonWith(field: String, value: kotlinx.serialization.json.JsonElement): JsonObject {
+        val json = codec.encode(image())
+        return JsonObject(json + (field to value))
+    }
+
+    private fun cropOf(left: Float, top: Float, right: Float, bottom: Float) = buildJsonObject {
+        put("left", left); put("top", top); put("right", right); put("bottom", bottom)
+    }
+
+    @Test
+    fun `a crop from a shared file is clamped into the image, and a nonsensical one is dropped`() {
+        val oversized = codec.decode(imageJsonWith("crop", cropOf(-50f, -10f, 900f, 120f))) { StrokePoints.EMPTY } as ImageElement
+        assertEquals(LocalRect(0f, 0f, 400f, 120f), oversized.crop)
+
+        val inverted = codec.decode(imageJsonWith("crop", cropOf(300f, 200f, 100f, 50f))) { StrokePoints.EMPTY } as ImageElement
+        assertNull(inverted.crop)
+
+        val notANumber = codec.decode(imageJsonWith("crop", cropOf(Float.NaN, 0f, 10f, 10f))) { StrokePoints.EMPTY } as ImageElement
+        assertNull(notANumber.crop)
+    }
+
+    @Test
+    fun `an image with no real size is a format error, and a non-finite turn reads as none`() {
+        val zeroSize = imageJsonWith("size", buildJsonObject { put("width", 0f); put("height", 300f) })
+        assertThrows(ElementFormatException::class.java) { codec.decode(zeroSize) { StrokePoints.EMPTY } }
+
+        val spinning = codec.decode(imageJsonWith("rotationDeg", kotlinx.serialization.json.JsonPrimitive(Float.POSITIVE_INFINITY))) { StrokePoints.EMPTY } as ImageElement
+        assertEquals(0f, spinning.rotationDeg, 0f)
+    }
+
     @Test
     fun `unknown fields on a known kind are kept through a round trip`() {
         val future = buildJsonObject { put("x", 1) }

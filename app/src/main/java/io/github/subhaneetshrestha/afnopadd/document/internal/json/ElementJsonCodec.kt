@@ -156,20 +156,28 @@ class ElementJsonCodec(
                     opacity = it.floatOr("opacity", 1f),
                 )
             },
-            rotationDeg = source.floatOr(KEY_ROTATION_DEG, 0f),
+            rotationDeg = source.floatOr(KEY_ROTATION_DEG, 0f).takeIf { it.isFinite() } ?: 0f,
             extras = extras,
         )
-        KIND_IMAGE -> ImageElement(
-            c.id, c.anchor, c.frameLevel, c.z, c.bounds, c.version, c.versionNonce, c.createdAt, c.updatedAt,
-            asset = AssetId(source.string(KEY_ASSET)),
-            size = source.obj(KEY_SIZE).let { LocalSize(width = it.float("width"), height = it.float("height")) },
-            rotationDeg = source.float(KEY_ROTATION_DEG),
-            crop = source[KEY_CROP]?.takeUnless { it is JsonNull }?.let { crop ->
-                (crop as? JsonObject ?: throw ElementFormatException("Element field '$KEY_CROP' must be an object"))
-                    .let { LocalRect(it.float("left"), it.float("top"), it.float("right"), it.float("bottom")) }
-            },
-            extras = extras,
-        )
+        KIND_IMAGE -> {
+            // Sheets arrive from other people's devices: a size must be real, a turn finite, and a
+            // crop inside the image, or code that clamps against them (crop mode) would throw.
+            val size = source.obj(KEY_SIZE).let { LocalSize(width = it.float("width"), height = it.float("height")) }
+            if (!(size.width.isFinite() && size.height.isFinite() && size.width > 0f && size.height > 0f)) {
+                throw ElementFormatException("Image size must be positive and finite, got $size")
+            }
+            ImageElement(
+                c.id, c.anchor, c.frameLevel, c.z, c.bounds, c.version, c.versionNonce, c.createdAt, c.updatedAt,
+                asset = AssetId(source.string(KEY_ASSET)),
+                size = size,
+                rotationDeg = source.float(KEY_ROTATION_DEG).takeIf { it.isFinite() } ?: 0f,
+                crop = source[KEY_CROP]?.takeUnless { it is JsonNull }?.let { crop ->
+                    (crop as? JsonObject ?: throw ElementFormatException("Element field '$KEY_CROP' must be an object"))
+                        .let { sanitizedCrop(LocalRect(it.float("left"), it.float("top"), it.float("right"), it.float("bottom")), size) }
+                },
+                extras = extras,
+            )
+        }
         KIND_NOTE -> NoteElement(
             c.id, c.anchor, c.frameLevel, c.z, c.bounds, c.version, c.versionNonce, c.createdAt, c.updatedAt,
             text = source.string(KEY_TEXT),
@@ -180,6 +188,16 @@ class ElementJsonCodec(
             kind = kind,
             extras = extras,
         )
+    }
+
+    /** [crop] clamped into the image, or none if it is not finite or covers nothing (the whole image is shown). */
+    private fun sanitizedCrop(crop: LocalRect, size: LocalSize): LocalRect? {
+        if (!(crop.left.isFinite() && crop.top.isFinite() && crop.right.isFinite() && crop.bottom.isFinite())) return null
+        val clamped = LocalRect(
+            crop.left.coerceIn(0f, size.width), crop.top.coerceIn(0f, size.height),
+            crop.right.coerceIn(0f, size.width), crop.bottom.coerceIn(0f, size.height),
+        )
+        return clamped.takeIf { it.right > it.left && it.bottom > it.top }
     }
 
     private inline fun <T> guarded(block: () -> T): T = try {

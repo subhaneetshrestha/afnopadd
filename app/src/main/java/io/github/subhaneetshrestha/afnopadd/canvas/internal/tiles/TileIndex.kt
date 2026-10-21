@@ -5,26 +5,34 @@ import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.log2
 import kotlin.math.pow
-import kotlin.math.roundToInt
 
 /** A tile of the pyramid: [level] sets its scale (2^level screen pixels per world unit), [x] and [y] its column and row. */
 internal data class TileKey(val level: Int, val x: Long, val y: Long)
 
 /**
  * The geometry of the tile pyramid (SPEC-canvas-engine decision 5): square [TILE_PX] tiles per
- * power-of-two level, the level nearest the camera's zoom (so a tile is drawn scaled by 0.71x to
- * 1.41x), and when tiles are worth it at all.
+ * power-of-two level, the level at or above the camera's zoom (so a tile is drawn scaled by 0.5x
+ * to 1x), and when tiles are worth it at all.
  */
 internal object TileGrid {
     const val TILE_PX = 256
 
-    /** More visible elements than this are drawn from tiles. */
-    const val MAX_VECTOR_ELEMENTS = 2_000
+    /**
+     * More visible elements than this are drawn from tiles. The spec's 2,000 was far too many to draw
+     * as meshes within a frame: a mesh stroke costs the UI thread about 65 us on the emulator, so 330
+     * of them took 22 ms (PerfTest, docs/perf/PERF.md).
+     */
+    const val MAX_VECTOR_ELEMENTS = 200
 
     /** Strokes thinner than this on screen count as hairlines. */
     const val HAIRLINE_PX = 0.5
 
-    fun levelFor(zoom: Double): Int = log2(zoom).roundToInt()
+    /**
+     * The level at or just above the zoom, so tiles are only ever drawn shrunk (0.5x to 1x) and
+     * stay as sharp as vectors; enlarged tiles would blur, which shows now that dense pages at
+     * working zoom use tiles too.
+     */
+    fun levelFor(zoom: Double): Int = ceil(log2(zoom) - 1e-9).toInt()
 
     fun scale(level: Int): Double = 2.0.pow(level)
 
@@ -50,9 +58,14 @@ internal object TileGrid {
         return keys
     }
 
-    /** Tiles pay off when there are too many elements to draw as vectors, or most strokes are hairlines. */
-    fun shouldTile(visibleElements: Int, hairlineStrokes: Int, visibleStrokes: Int): Boolean =
-        visibleElements > MAX_VECTOR_ELEMENTS || (visibleStrokes > 0 && hairlineStrokes * 2 > visibleStrokes)
+    /**
+     * Tiles pay off when there are too many elements to draw as vectors, or most strokes are
+     * hairlines; never when any stroke is magnified past [io.github.subhaneetshrestha.afnopadd.canvas.internal.DeepZoom.FINE_ABOVE],
+     * since only the vector path draws the finer and rebased deep-zoom variants, and a tile would
+     * show facets and float jitter its vector patch does not.
+     */
+    fun shouldTile(visibleElements: Int, hairlineStrokes: Int, visibleStrokes: Int, deepStrokes: Int = 0): Boolean =
+        deepStrokes == 0 && (visibleElements > MAX_VECTOR_ELEMENTS || (visibleStrokes > 0 && hairlineStrokes * 2 > visibleStrokes))
 
     /** A tenth of the app's memory class, between 48 and 128 MB (SPEC-canvas-engine decision 3, owner). */
     fun budgetBytes(memoryClassMb: Int): Long = (memoryClassMb / 10L).coerceIn(48L, 128L) shl 20
@@ -75,6 +88,15 @@ internal class TileStore<T>(
     private val pending = HashMap<TileKey, Long>()
     private var nextToken = 1L
     private var frame = 0L
+
+    /**
+     * The budget actually kept: never less than [screenBytes] (set by the layer to about one and a
+     * half screens of tiles), since tiles on screen are never evicted and a large tablet at 0.5x
+     * needs more than the memory-class budget.
+     */
+    var screenBytes = 0L
+
+    private val effectiveBudget: Long get() = maxOf(budgetBytes, screenBytes)
 
     var heldBytes = 0L
         private set
@@ -139,11 +161,12 @@ internal class TileStore<T>(
     }
 
     private fun trim() {
-        if (heldBytes <= budgetBytes) return
+        val budget = effectiveBudget
+        if (heldBytes <= budget) return
         val victims = ArrayList<TileKey>()
         var bytes = heldBytes
         for ((key, entry) in held) {
-            if (bytes <= budgetBytes) break
+            if (bytes <= budget) break
             if (entry.lastFrame == frame) continue
             victims += key
             bytes -= entry.bytes

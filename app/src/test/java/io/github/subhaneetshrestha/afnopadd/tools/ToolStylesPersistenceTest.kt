@@ -38,6 +38,17 @@ class ToolStylesPersistenceTest {
     }
 
     @Test
+    fun `a change made before the saved styles arrive is not overwritten by them`() {
+        val styles = ToolStyles(BuiltInPresets.defaultStyles)
+        styles.update(BuiltInTools.PEN) { it.copy(widthPx = 11f) }
+
+        styles.restore(mapOf(BuiltInTools.PEN to ToolStyle(0xFF00FF00, 9f), BuiltInTools.BRUSH to ToolStyle(0xFF0000FF, 5f)))
+
+        assertEquals(11f, styles.styleFor(BuiltInTools.PEN).widthPx, 0f)
+        assertEquals(ToolStyle(0xFF0000FF, 5f), styles.styleFor(BuiltInTools.BRUSH))
+    }
+
+    @Test
     fun `resetting returns every tool to its default`() {
         val styles = ToolStyles(BuiltInPresets.defaultStyles)
         styles.update(BuiltInTools.PEN) { it.copy(widthPx = 12f) }

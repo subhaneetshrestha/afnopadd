@@ -14,6 +14,7 @@ import io.github.subhaneetshrestha.afnopadd.images.internal.ImageNormalizer
 import io.github.subhaneetshrestha.afnopadd.images.internal.ImagePlacement
 import io.github.subhaneetshrestha.afnopadd.images.internal.NormalizeException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
@@ -75,15 +76,20 @@ class AndroidImageImporter(
     private val clock: () -> Long = System::currentTimeMillis,
     private val random: Random = Random.Default,
     private val ulid: Ulid = Ulid.Default,
+    /** Sources larger than this are refused before they fill the cache (a file picker can hand over anything). */
+    maxSourceBytes: Long = ImageNormalizer.MAX_SOURCE_BYTES,
 ) : ImageImporter {
 
-    private val normalizer = ImageNormalizer(context.contentResolver, File(context.cacheDir, "import"))
+    private val normalizer = ImageNormalizer(context.contentResolver, File(context.cacheDir, "import"), maxSourceBytes)
 
     override suspend fun import(sources: List<Uri>, sheet: Sheet, placement: Placement, onProgress: (Int, Int) -> Unit): ImportSummary {
         val stored = mutableListOf<Pair<Int, Outcome.Stored>>()
         val outcomes = arrayOfNulls<ImportResult>(sources.size)
         withContext(Dispatchers.IO) {
             sources.forEachIndexed { i, uri ->
+                // A cancelled import stops between sources and adds nothing; what it stored is
+                // unreferenced and collected when the sheet closes.
+                ensureActive()
                 when (val outcome = store(uri, sheet)) {
                     is Outcome.Stored -> stored += i to outcome
                     is Outcome.Failed -> outcomes[i] = ImportResult.Failed(uri.toString(), outcome.reason)

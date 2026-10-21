@@ -239,11 +239,31 @@ class SelectToolTest {
         controller.onPointer(event(PointerPhase.MOVE, 264.0, 164.0, 16L))
 
         assertEquals(setOf(rectangle.id), controller.hiddenElements.value)
-        assertEquals(1, controller.previewElements.value.size)
+        // The untouched element under a transform, so its cached mesh is reused every frame.
+        assertTrue(controller.previewElements.value.single() === sheet.snapshot.value.elements.getValue(rectangle.id))
+        val transform = controller.previewTransform.value!!
+        assertEquals(2.0, transform.scale, 1e-6)
+        assertEquals(io.github.subhaneetshrestha.afnopadd.document.WorldPoint(150.0, 50.0), transform.pivot)
         assertEquals(0, transactions)
         controller.onPointer(event(PointerPhase.CANCEL, 264.0, 164.0, 32L))
         assertEquals(0, transactions)
+        assertEquals(null, controller.previewTransform.value)
         assertEquals(rectangle, sheet.snapshot.value.elements.getValue(rectangle.id))
+    }
+
+    @Test
+    fun `the preview transform lands where the committed geometry does`() {
+        selection.set(setOf(rectangle.id))
+        controller.onPointer(event(PointerPhase.DOWN, 150.0, -35.0, 0L))
+        controller.onPointer(event(PointerPhase.MOVE, 235.0, 50.0, 16L))
+        val previewed = controller.previewTransform.value!!.apply(rectangle.bounds)
+
+        controller.onPointer(event(PointerPhase.UP, 235.0, 50.0, 32L))
+
+        val committed = sheet.snapshot.value.elements.getValue(rectangle.id).bounds
+        // The committed box may add a mitre margin for the turned corners; it contains the preview's.
+        assertTrue("$committed contains $previewed", committed.left <= previewed.left + 1e-6 && committed.right >= previewed.right - 1e-6)
+        assertEquals((previewed.top + previewed.bottom) / 2, (committed.top + committed.bottom) / 2, 1e-6)
     }
 
     @Test

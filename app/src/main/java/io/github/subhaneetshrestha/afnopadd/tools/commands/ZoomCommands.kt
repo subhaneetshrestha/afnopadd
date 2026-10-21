@@ -21,6 +21,8 @@ class ZoomCommands(
     private val viewport: () -> Viewport,
     private val contentBounds: () -> WorldRect?,
     private val animateTo: (Camera) -> Unit,
+    /** Whether a zoom animation is still running; a new step then starts from its target. */
+    private val animating: () -> Boolean = { false },
 ) {
     private val always = MutableStateFlow(true)
 
@@ -33,11 +35,18 @@ class ZoomCommands(
         Command(ZOOM_100, R.string.command_zoom_100, R.drawable.ic_zoom_100, always) { animateTo(camera.camera.value.copy(zoom = 1.0)) },
     )
 
-    /** Zooming about the viewport centre keeps the camera's centre, so only the zoom changes. */
+    /**
+     * Zooming about the viewport centre keeps the camera's centre, so only the zoom changes. A step
+     * taken while the previous one still animates builds on where that one is heading, not on the
+     * camera halfway there, so two quick taps make exactly 2.25x.
+     */
     private fun step(factor: Double) {
         val current = camera.camera.value
-        animateTo(current.copy(zoom = (current.zoom * factor).coerceIn(Camera.MIN_ZOOM, Camera.MAX_ZOOM)))
+        val from = lastTarget?.takeIf { it.center == current.center && current.zoom != it.zoom && animating() } ?: current
+        animateTo(from.copy(zoom = (from.zoom * factor).coerceIn(Camera.MIN_ZOOM, Camera.MAX_ZOOM)).also { lastTarget = it })
     }
+
+    private var lastTarget: Camera? = null
 
     companion object {
         const val ZOOM_IN = "cmd:zoom-in"

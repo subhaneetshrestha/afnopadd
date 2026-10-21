@@ -86,8 +86,9 @@ class CropController(private val context: ToolContext, val imageId: ElementId) :
                 val start = gesture.startCrop
                 val width = start.right - start.left
                 val height = start.bottom - start.top
-                val left = (start.left + local.x - grab.startLocal.x).coerceIn(0f, image.size.width - width)
-                val top = (start.top + local.y - grab.startLocal.y).coerceIn(0f, image.size.height - height)
+                // A crop never exceeds the image (the decoder clamps it), but never let a bad one throw here.
+                val left = (start.left + local.x - grab.startLocal.x).coerceIn(0f, maxOf(0f, image.size.width - width))
+                val top = (start.top + local.y - grab.startLocal.y).coerceIn(0f, maxOf(0f, image.size.height - height))
                 LocalRect(left, top, left + width, top + height)
             }
         }

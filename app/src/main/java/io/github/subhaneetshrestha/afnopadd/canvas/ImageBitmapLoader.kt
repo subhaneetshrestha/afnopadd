@@ -16,10 +16,10 @@ import java.io.File
  */
 fun interface ImageBitmapLoader {
     /**
-     * Starts loading [file] fitted within [maxEdgePx] on its long edge; [onLoaded] runs on the main
-     * thread. Returns a function that cancels the load if it is still running.
+     * Starts loading [file] fitted within [maxEdgePx] on its long edge; [onLoaded] or [onFailed]
+     * runs on the main thread. Returns a function that cancels the load if it is still running.
      */
-    fun load(file: File, maxEdgePx: Int, onLoaded: (Bitmap) -> Unit): () -> Unit
+    fun load(file: File, maxEdgePx: Int, onLoaded: (Bitmap) -> Unit, onFailed: () -> Unit): () -> Unit
 }
 
 /**
@@ -28,14 +28,14 @@ fun interface ImageBitmapLoader {
  * bucket seen before is instant.
  */
 class CoilImageBitmapLoader(private val context: Context) : ImageBitmapLoader {
-    override fun load(file: File, maxEdgePx: Int, onLoaded: (Bitmap) -> Unit): () -> Unit {
+    override fun load(file: File, maxEdgePx: Int, onLoaded: (Bitmap) -> Unit, onFailed: () -> Unit): () -> Unit {
         val request = ImageRequest.Builder(context)
             .data(file)
             .size(maxEdgePx, maxEdgePx)
             .scale(Scale.FIT)
             .precision(Precision.INEXACT)
             .allowHardware(true)
-            .target(onSuccess = { image -> onLoaded(image.toBitmap()) })
+            .target(onSuccess = { image -> onLoaded(image.toBitmap()) }, onError = { onFailed() })
             .build()
         val disposable = SingletonImageLoader.get(context).enqueue(request)
         return { disposable.dispose() }

@@ -89,6 +89,7 @@ class RendererPerfTest {
                 CanvasMath.screenToWorld(camera, viewport, ScreenPoint(viewport.widthPx.toDouble(), viewport.heightPx.toDouble())).x,
                 CanvasMath.screenToWorld(camera, viewport, ScreenPoint(viewport.widthPx.toDouble(), viewport.heightPx.toDouble())).y,
             )
+            layer.beginFrame()
             layer.draw(canvas, index.visible(snapshot, visibleWorld), emptySet(), camera, viewport)
             node.endRecording()
             times += (System.nanoTime() - start) / 1e6

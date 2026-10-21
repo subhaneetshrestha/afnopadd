@@ -256,6 +256,22 @@ class DryStrokeRenderingTest {
         assertTrue(cache.estimatedBytes <= perSmall * 3)
     }
 
+    /** More finely tessellated deep-zoom strokes than a short LRU held, drawn in the same order each frame: built once each. */
+    @Test
+    fun deepZoomVariantsAreBuiltOnceWhileEveryFrameDrawsThem() {
+        val elements = List(80) { horizontalStroke(0.0, 500.0, it * 10.0, sizeWorld = 4f) }
+        val cache = StrokeCache()
+
+        repeat(3) {
+            cache.beginFrame()
+            elements.forEach { cache.fineFor(it) }
+        }
+
+        assertEquals("80 fine meshes, built on the first frame only", 80L, cache.buildCount)
+        assertTrue(cache.variantEstimatedBytes > 0)
+        assertEquals("the plain meshes are untouched", 0, cache.size)
+    }
+
     @Test
     fun aChangedStrokeReplacesItsCachedMesh() {
         val stroke = horizontalStroke(0.0, 500.0, 0.0, sizeWorld = 4f)

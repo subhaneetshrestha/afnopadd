@@ -36,7 +36,11 @@ internal class NormalizedImage(val file: File, val mime: String, val width: Int,
  * cap, and re-encoded: JPEG at quality 90 when opaque, lossless (WebP where the platform can write
  * it, PNG on API 29) when it has alpha.
  */
-internal class ImageNormalizer(private val resolver: ContentResolver, private val workDir: File) {
+internal class ImageNormalizer(
+    private val resolver: ContentResolver,
+    private val workDir: File,
+    private val maxSourceBytes: Long = MAX_SOURCE_BYTES,
+) {
 
     fun normalize(uri: Uri): NormalizedImage {
         val source = copyToWorkDir(uri)
@@ -70,8 +74,24 @@ internal class ImageNormalizer(private val resolver: ContentResolver, private va
         val file = File(workDir, "import-${UUID.randomUUID()}")
         try {
             val input = resolver.openInputStream(uri) ?: throw IOException("No stream for $uri")
-            input.use { stream -> file.outputStream().use { stream.copyTo(it) } }
+            var copied = 0L
+            input.use { stream ->
+                file.outputStream().use { out ->
+                    val buffer = ByteArray(64 * 1024)
+                    while (true) {
+                        val read = stream.read(buffer)
+                        if (read < 0) break
+                        copied += read
+                        // Stop before an endless or enormous source fills the cache partition.
+                        if (copied > maxSourceBytes) throw NormalizeException(ImportFailure.UNSUPPORTED, "Source is larger than $maxSourceBytes bytes")
+                        out.write(buffer, 0, read)
+                    }
+                }
+            }
             return file
+        } catch (e: NormalizeException) {
+            file.delete()
+            throw e
         } catch (e: IOException) {
             file.delete()
             throw NormalizeException(ImportFailure.UNREADABLE, "Could not read the source", e)
@@ -116,6 +136,9 @@ internal class ImageNormalizer(private val resolver: ContentResolver, private va
     companion object {
         /** The stored long edge never exceeds this (owner decision 2 in SPEC-image-board). */
         const val MAX_EDGE_PX = 4_096
+
+        /** Far above any photo (a 48 MP JPEG is about 25 MB), well below what would fill a phone's cache. */
+        const val MAX_SOURCE_BYTES = 200L * 1024 * 1024
         private const val JPEG_QUALITY = 90
         private val STORED_AS_IS = setOf("image/jpeg", "image/png", "image/webp")
     }

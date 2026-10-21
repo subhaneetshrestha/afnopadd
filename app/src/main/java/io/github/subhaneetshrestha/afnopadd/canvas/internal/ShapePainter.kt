@@ -7,6 +7,7 @@ import android.graphics.Path
 import android.graphics.RectF
 import io.github.subhaneetshrestha.afnopadd.canvas.FrameTransform
 import io.github.subhaneetshrestha.afnopadd.canvas.ShapeOutline
+import io.github.subhaneetshrestha.afnopadd.document.LocalPoint
 import io.github.subhaneetshrestha.afnopadd.document.ShapeElement
 import io.github.subhaneetshrestha.afnopadd.document.ShapeKind
 import kotlin.math.max
@@ -28,9 +29,14 @@ internal class ShapePainter {
     private val matrix = Matrix()
     private val oval = RectF()
 
-    fun draw(canvas: Canvas, shape: ShapeElement, transform: FrameTransform) {
-        val start = shape.geometry.start
-        val end = shape.geometry.end
+    /**
+     * Draws [shape]. At extreme zoom the caller passes an [originX], [originY] near the view (frame
+     * units): the geometry is moved by it before it reaches floats, and the transform makes up for
+     * it in doubles, so a shape stays put to the pixel where the plain translation runs to millions.
+     */
+    fun draw(canvas: Canvas, shape: ShapeElement, transform: FrameTransform, originX: Double = 0.0, originY: Double = 0.0) {
+        val start = shifted(shape.geometry.start, originX, originY)
+        val end = shifted(shape.geometry.end, originX, originY)
         path.reset()
         when (shape.shape) {
             ShapeKind.ELLIPSE -> {
@@ -59,7 +65,7 @@ internal class ShapePainter {
         } else {
             matrix.setScale(scale, scale)
         }
-        matrix.postTranslate(transform.translateX.toFloat(), transform.translateY.toFloat())
+        matrix.postTranslate((transform.translateX + originX * transform.scale).toFloat(), (transform.translateY + originY * transform.scale).toFloat())
         path.transform(matrix)
         paint.strokeJoin = if (shape.shape == ShapeKind.RECTANGLE) Paint.Join.MITER else Paint.Join.ROUND
         paint.strokeWidth = shape.style.strokeWidth * scale
@@ -67,4 +73,7 @@ internal class ShapePainter {
         paint.color = (alpha shl 24) or (shape.style.colorArgb and 0x00FFFFFF).toInt()
         canvas.drawPath(path, paint)
     }
+
+    private fun shifted(point: LocalPoint, originX: Double, originY: Double) =
+        if (originX == 0.0 && originY == 0.0) point else LocalPoint((point.x - originX).toFloat(), (point.y - originY).toFloat())
 }

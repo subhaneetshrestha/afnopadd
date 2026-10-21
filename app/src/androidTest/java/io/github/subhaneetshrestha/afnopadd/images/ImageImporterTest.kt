@@ -11,6 +11,7 @@ import io.github.subhaneetshrestha.afnopadd.document.ImageElement
 import io.github.subhaneetshrestha.afnopadd.document.Sheet
 import io.github.subhaneetshrestha.afnopadd.document.WorldPoint
 import io.github.subhaneetshrestha.afnopadd.document.internal.RoomSheetStore
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -123,6 +124,42 @@ class ImageImporterTest {
         assertEquals(ImportFailure.UNSUPPORTED, summary.failed[0].reason)
         assertEquals(ImportFailure.UNREADABLE, summary.failed[1].reason)
         assertEquals(1, images().size)
+    }
+
+    @Test
+    fun aCancelledBatchStopsBetweenImagesAndAddsNone() {
+        val uris = (1..5).map { i -> fixture("cancel$i.png", 50 * i, 50, Bitmap.CompressFormat.PNG) { it.eraseColor(Color.GRAY) } }
+        var done = 0
+
+        runBlocking {
+            val job = launch(kotlinx.coroutines.Dispatchers.Default) {
+                importer.import(uris, sheet, placement) { finished, _ ->
+                    done = finished
+                    if (finished == 1) this.coroutineContext[kotlinx.coroutines.Job]!!.cancel()
+                }
+            }
+            job.join()
+        }
+
+        assertTrue("stopped early, after $done", done < uris.size)
+        assertTrue("half a batch is never added", images().isEmpty())
+    }
+
+    @Test
+    fun anOversizedSourceIsRefusedWithoutFillingTheCache() {
+        // A valid PNG, refused only because it is over the cap: noise does not compress.
+        val random = kotlin.random.Random(3)
+        val big = fixture("noise.png", 200, 200, Bitmap.CompressFormat.PNG) { bitmap ->
+            for (x in 0 until 200) for (y in 0 until 200) bitmap.setPixel(x, y, random.nextInt() or (0xFF shl 24))
+        }
+        assertTrue("fixture is over the cap", File(big.path!!).length() > 16 * 1024)
+        val smallCap = AndroidImageImporter(context, maxSourceBytes = 16 * 1024)
+
+        val summary = runBlocking { smallCap.import(listOf(big), sheet, placement) }
+
+        assertEquals(ImportFailure.UNSUPPORTED, summary.failed.single().reason)
+        assertEquals("the same file is fine under the normal cap", 1, runBlocking { importer.import(listOf(big), sheet, placement) }.imported.size)
+        assertTrue("no partial copy left behind", File(context.cacheDir, "import").listFiles().orEmpty().isEmpty())
     }
 
     @Test

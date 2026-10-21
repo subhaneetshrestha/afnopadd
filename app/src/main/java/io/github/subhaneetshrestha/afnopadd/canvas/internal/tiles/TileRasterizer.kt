@@ -13,6 +13,7 @@ import io.github.subhaneetshrestha.afnopadd.document.ElementSnapshot
 import java.io.File
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -27,7 +28,7 @@ internal class TileRasterizer(fileFor: (AssetId) -> File?) {
         Thread(runnable, "afnopadd-tiles").apply { priority = Thread.NORM_PRIORITY - 1 }
     }
     private val main = Handler(Looper.getMainLooper())
-    private val painter = RegionPainter(fileFor)
+    private val painter = RegionPainter(fileFor, imageCacheBytes = 24 * 1024 * 1024, sketchSmallStrokes = true, maxImagePx = 2_048)
     private val index = ElementIndex()
 
     /** Renders queued but not started; the layer keeps this small so a fast pan does not build a backlog. */
@@ -39,11 +40,21 @@ internal class TileRasterizer(fileFor: (AssetId) -> File?) {
      * no longer wanted by the time its turn came ([stillWanted] is asked on the tile thread) or failed.
      */
     fun render(snapshot: ElementSnapshot, key: TileKey, stillWanted: () -> Boolean, onDone: (Bitmap?) -> Unit) {
+        if (executor.isShutdown) {
+            onDone(null)
+            return
+        }
         queued.incrementAndGet()
-        executor.execute {
+        try {
+            executor.execute {
+                queued.decrementAndGet()
+                val tile = if (stillWanted()) draw(snapshot, key) else null
+                main.post { onDone(tile) }
+            }
+        } catch (e: RejectedExecutionException) {
+            // Shut down between the check and the call: nothing to render any more.
             queued.decrementAndGet()
-            val tile = if (stillWanted()) draw(snapshot, key) else null
-            main.post { onDone(tile) }
+            onDone(null)
         }
     }
 
@@ -67,6 +78,11 @@ internal class TileRasterizer(fileFor: (AssetId) -> File?) {
     } catch (e: RuntimeException) {
         // A tile is an optimisation: the layer draws vectors where one is missing.
         Log.w(TAG, "Could not render tile $key", e)
+        null
+    } catch (e: OutOfMemoryError) {
+        // Uncaught here it would kill the process from the tile thread; vectors stand in instead.
+        painter.clear()
+        Log.w(TAG, "Out of memory rendering tile $key", e)
         null
     }
 

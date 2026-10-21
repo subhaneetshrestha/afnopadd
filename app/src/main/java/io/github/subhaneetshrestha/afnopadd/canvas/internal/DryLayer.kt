@@ -8,6 +8,7 @@ import androidx.core.graphics.withMatrix
 import androidx.ink.rendering.android.canvas.CanvasStrokeRenderer
 import io.github.subhaneetshrestha.afnopadd.canvas.Camera
 import io.github.subhaneetshrestha.afnopadd.canvas.CanvasMath
+import io.github.subhaneetshrestha.afnopadd.canvas.FrameTransform
 import io.github.subhaneetshrestha.afnopadd.canvas.Viewport
 import io.github.subhaneetshrestha.afnopadd.document.Element
 import io.github.subhaneetshrestha.afnopadd.document.ElementId
@@ -60,36 +61,78 @@ internal class DryLayer(
 
     val sketchCount: Int get() = sketches.size
 
-    fun draw(canvas: Canvas, elements: List<Element>, hidden: Set<ElementId>, camera: Camera, viewport: Viewport) {
+    /**
+     * Starts a frame: meshes and image bitmaps drawn from now on are kept until the next call, even
+     * over budget. Call once per frame before every [draw] of that frame; without frames, the caches
+     * are plain LRU.
+     */
+    fun beginFrame() {
         cache.beginFrame()
         imagePainter?.beginFrame()
+    }
+
+    fun draw(canvas: Canvas, elements: List<Element>, hidden: Set<ElementId>, camera: Camera, viewport: Viewport) {
         for (element in elements) {
             if (element.id in hidden) continue
             if (element is StrokeElement) {
-                // Ink positions the stroke with the canvas transform; the matrix argument only
-                // tells it the stroke-to-screen scale for anti-aliasing, so both must agree.
                 val transform = CanvasMath.frameToScreen(camera, viewport, element.anchor, element.frameLevel)
-                matrix.setScale(transform.scale.toFloat(), transform.scale.toFloat())
-                matrix.postTranslate(transform.translateX.toFloat(), transform.translateY.toFloat())
-                if (max(element.bounds.width, element.bounds.height) * camera.zoom < SKETCH_MAX_PX) {
-                    val sketch = sketchFor(element)
-                    sketchPaint.color = sketch.color
-                    sketchPaint.strokeWidth = element.brush.size
-                    canvas.withMatrix(matrix) { drawPath(sketch.path, sketchPaint) }
-                } else {
-                    val stroke = cache.strokeFor(element)
-                    canvas.withMatrix(matrix) { renderer.draw(this, stroke, matrix) }
+                when (val variant = DeepZoom.variantFor(transform, viewport)) {
+                    DeepZoom.Base -> {
+                        setMatrix(transform)
+                        if (max(element.bounds.width, element.bounds.height) * camera.zoom < SKETCH_MAX_PX) {
+                            val sketch = sketchFor(element)
+                            sketchPaint.color = sketch.color
+                            sketchPaint.strokeWidth = element.brush.size
+                            canvas.withMatrix(matrix) { drawPath(sketch.path, sketchPaint) }
+                        } else {
+                            drawStroke(canvas, cache.strokeFor(element))
+                        }
+                    }
+                    DeepZoom.Fine -> {
+                        setMatrix(transform)
+                        drawStroke(canvas, cache.fineFor(element))
+                    }
+                    is DeepZoom.Clipped -> {
+                        setMatrix(DeepZoom.drawTransform(transform, variant))
+                        cache.clippedFor(element, variant).forEach { drawStroke(canvas, it) }
+                    }
                 }
             } else if (element is ShapeElement) {
-                shapePainter.draw(canvas, element, CanvasMath.frameToScreen(camera, viewport, element.anchor, element.frameLevel))
+                val transform = CanvasMath.frameToScreen(camera, viewport, element.anchor, element.frameLevel)
+                val origin = deepOrigin(transform, viewport)
+                shapePainter.draw(canvas, element, transform, origin?.first ?: 0.0, origin?.second ?: 0.0)
             } else if (element is ImageElement && imagePainter != null) {
-                imagePainter.draw(canvas, element, CanvasMath.frameToScreen(camera, viewport, element.anchor, element.frameLevel))
+                val transform = CanvasMath.frameToScreen(camera, viewport, element.anchor, element.frameLevel)
+                val origin = deepOrigin(transform, viewport)
+                imagePainter.draw(canvas, element, transform, origin?.first ?: 0.0, origin?.second ?: 0.0)
             } else {
                 val topLeft = CanvasMath.worldToScreen(camera, viewport, WorldPoint(element.bounds.left, element.bounds.top))
                 val bottomRight = CanvasMath.worldToScreen(camera, viewport, WorldPoint(element.bounds.right, element.bounds.bottom))
                 canvas.drawRect(topLeft.x.toFloat(), topLeft.y.toFloat(), bottomRight.x.toFloat(), bottomRight.y.toFloat(), outlinePaint)
             }
         }
+    }
+
+    /** Ink positions the stroke with the canvas transform; the matrix argument only tells it the
+     * stroke-to-screen scale for anti-aliasing, so both are the same [matrix]. */
+    private fun drawStroke(canvas: Canvas, stroke: androidx.ink.strokes.Stroke) {
+        canvas.withMatrix(matrix) { renderer.draw(this, stroke, matrix) }
+    }
+
+    private fun setMatrix(transform: FrameTransform) {
+        matrix.setScale(transform.scale.toFloat(), transform.scale.toFloat())
+        matrix.postTranslate(transform.translateX.toFloat(), transform.translateY.toFloat())
+    }
+
+    /**
+     * Beyond [DeepZoom.CLIP_ABOVE], the view's centre in the element's frame units, as an exact
+     * float, for the painters to rebase shapes and images around; null at ordinary zooms.
+     */
+    private fun deepOrigin(transform: FrameTransform, viewport: Viewport): Pair<Double, Double>? {
+        if (transform.scale <= DeepZoom.CLIP_ABOVE) return null
+        val x = ((viewport.centerX - transform.translateX) / transform.scale).toFloat().toDouble()
+        val y = ((viewport.centerY - transform.translateY) / transform.scale).toFloat().toDouble()
+        return x to y
     }
 
     /** Lets go of image bitmaps and loads in flight. */
@@ -101,9 +144,19 @@ internal class DryLayer(
         val cached = sketches[element.id]
         if (cached != null && cached.points === element.points && cached.brushKey == element.brush) return cached
         val points = element.points
-        val path = Path()
-        if (points.count > 0) {
-            // Every n-th sample, always keeping the last, so a sketch has at most SKETCH_POINTS points.
+        return Sketch(points, element.brush, sketchPath(points), InkBridge.colorIntArgb(element.brush)).also { sketches[element.id] = it }
+    }
+
+    companion object {
+        /** Strokes whose bounds span fewer screen pixels than this are drawn as sketches. */
+        const val SKETCH_MAX_PX = 32.0
+        private const val SKETCH_POINTS = 16
+        private const val MAX_SKETCHES = 20_000
+
+        /** Every n-th sample, always keeping the last, so a sketch has at most [SKETCH_POINTS] points. */
+        fun sketchPath(points: StrokePoints): Path {
+            val path = Path()
+            if (points.count == 0) return path
             val step = max(1, (points.count + SKETCH_POINTS - 1) / SKETCH_POINTS)
             path.moveTo(points.x(0), points.y(0))
             var i = step
@@ -112,14 +165,7 @@ internal class DryLayer(
                 i += step
             }
             path.lineTo(points.x(points.count - 1), points.y(points.count - 1))
+            return path
         }
-        return Sketch(points, element.brush, path, InkBridge.colorIntArgb(element.brush)).also { sketches[element.id] = it }
-    }
-
-    private companion object {
-        /** Strokes whose bounds span fewer screen pixels than this are drawn as sketches. */
-        const val SKETCH_MAX_PX = 32.0
-        const val SKETCH_POINTS = 16
-        const val MAX_SKETCHES = 20_000
     }
 }

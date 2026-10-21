@@ -54,7 +54,7 @@ class ImageRenderingTest {
     /** Answers at once with a solid red bitmap of the asked size, and remembers every size asked for. */
     private class RecordingLoader : ImageBitmapLoader {
         val requested = mutableListOf<Int>()
-        override fun load(file: File, maxEdgePx: Int, onLoaded: (Bitmap) -> Unit): () -> Unit {
+        override fun load(file: File, maxEdgePx: Int, onLoaded: (Bitmap) -> Unit, onFailed: () -> Unit): () -> Unit {
             requested += maxEdgePx
             onLoaded(createBitmap(maxEdgePx, maxEdgePx / 2).apply { eraseColor(Color.RED) })
             return {}

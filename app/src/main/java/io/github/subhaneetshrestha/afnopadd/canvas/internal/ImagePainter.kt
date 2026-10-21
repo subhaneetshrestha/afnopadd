@@ -32,6 +32,8 @@ internal class ImagePainter(
         var bitmap: Bitmap? = null
         var bucket = 0
         var pendingBucket = 0
+        /** A size that failed to load; not asked for again until the zoom wants another. */
+        var failedBucket = 0
         var cancel: (() -> Unit)? = null
         var lastFrame = 0L
     }
@@ -54,16 +56,19 @@ internal class ImagePainter(
         frame++
     }
 
-    fun draw(canvas: Canvas, image: ImageElement, transform: FrameTransform) {
+    /** Draws [image]; [originX], [originY] rebase it near the view at extreme zoom, as for shapes. */
+    fun draw(canvas: Canvas, image: ImageElement, transform: FrameTransform, originX: Double = 0.0, originY: Double = 0.0) {
         val scale = transform.scale.toFloat()
         val entry = entryFor(image, max(image.size.width, image.size.height) * transform.scale)
         val visible = image.crop
+        val ox = originX.toFloat()
+        val oy = originY.toFloat()
         canvas.withSave {
-            translate(transform.translateX.toFloat(), transform.translateY.toFloat())
+            translate((transform.translateX + originX * transform.scale).toFloat(), (transform.translateY + originY * transform.scale).toFloat())
             scale(scale, scale)
-            if (image.rotationDeg != 0f) rotate(image.rotationDeg, image.size.width / 2, image.size.height / 2)
-            if (visible != null) clipRect(visible.left, visible.top, visible.right, visible.bottom)
-            frameRect.set(0f, 0f, image.size.width, image.size.height)
+            if (image.rotationDeg != 0f) rotate(image.rotationDeg, image.size.width / 2 - ox, image.size.height / 2 - oy)
+            if (visible != null) clipRect(visible.left - ox, visible.top - oy, visible.right - ox, visible.bottom - oy)
+            frameRect.set(-ox, -oy, image.size.width - ox, image.size.height - oy)
             val bitmap = entry?.bitmap
             if (bitmap != null) {
                 drawBitmap(bitmap, null, frameRect, bitmapPaint)
@@ -85,19 +90,31 @@ internal class ImagePainter(
         val bucket = ImageBuckets.bucketFor(screenLongEdgePx)
         val entry = entries.getOrPut(image.asset) { Entry() }
         entry.lastFrame = frame
-        if (entry.bucket != bucket && entry.pendingBucket != bucket) {
+        if (entry.bucket != bucket && entry.pendingBucket != bucket && entry.failedBucket != bucket) {
             val file = fileFor(image.asset) ?: return entry
             entry.cancel?.invoke()
             entry.pendingBucket = bucket
-            val cancel = loader.load(file, bucket) { bitmap ->
-                if (entry.pendingBucket != bucket) return@load
-                entry.bitmap = bitmap
-                entry.bucket = bucket
-                entry.pendingBucket = 0
-                entry.cancel = null
-                trim()
-                onLoaded()
-            }
+            val cancel = loader.load(
+                file, bucket,
+                onLoaded = { bitmap ->
+                    if (entry.pendingBucket == bucket) {
+                        entry.bitmap = bitmap
+                        entry.bucket = bucket
+                        entry.pendingBucket = 0
+                        entry.failedBucket = 0
+                        entry.cancel = null
+                        trim()
+                        onLoaded()
+                    }
+                },
+                onFailed = {
+                    if (entry.pendingBucket == bucket) {
+                        entry.pendingBucket = 0
+                        entry.failedBucket = bucket
+                        entry.cancel = null
+                    }
+                },
+            )
             // A loader may answer before returning (a memory-cache hit); then there is nothing to cancel.
             if (entry.pendingBucket == bucket) entry.cancel = cancel
         }
