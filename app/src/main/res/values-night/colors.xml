@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dark mode: the window and launch screen in near-black ink, as in the dark icon concept (variant D). -->
+    <color name="app_window_background">#1E2229</color>
+</resources>

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The themed-icon layer (Android 13+): the same stroke and dot in one colour, which the launcher tints. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:pivotX="54"
+        android:pivotY="54"
+        android:scaleX="0.82"
+        android:scaleY="0.82">
+        <path
+            android:fillColor="#FF000000"
+            android:pathData="M24,76 C30,54 46,36 66,32 C73,30.6 79,31.6 82,34 C81,35.2 79.5,35.4 77.8,35.2 C62,34.5 45,48 34,72 C32.5,75.5 29,79 26.5,78.6 C25,78.3 23.8,77.6 24,76 Z" />
+        <path
+            android:fillColor="#FF000000"
+            android:pathData="M75,62.5 A6.5,6.5 0 1,1 75,75.5 A6.5,6.5 0 1,1 75,62.5 Z" />
+    </group>
+</vector>

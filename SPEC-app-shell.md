@@ -30,7 +30,7 @@ As built in Task 19: `FingerMode { AUTO, DRAW, NAVIGATE }` lives in `drawing-too
 3. **Lifecycle.** `onStop` calls `sheet.flush()` and schedules a thumbnail refresh; `onDestroy` with `isFinishing` closes the sheet. The activity handles `ACTION_VIEW`/`ACTION_SEND` by delegating to `sharing.PackageReceiver` and then navigating to the editor.
 4. **Finger mode AUTO** means fingers draw until a stylus pointer has been seen on the device (persisted flag), after which fingers pan; the setting can force either.
 5. **Window sizes.** Compact width uses the bottom toolbar; medium and expanded use a side rail; the editor is usable in split-screen.
-6. **Theme** uses the Material 3 baseline palette with a single brand colour; the canvas background is independent of the theme.
+6. **Theme** uses the Material 3 baseline palette with a single brand colour; the canvas background is independent of the theme. As decided by the owner on 2026-10-21: the palette comes from the app icon, ink #20242C on warm paper #FAF3E6 with a vermilion accent (#E4572E; #C2462A where it carries text), and in dark mode paper-coloured ink #F3EBDD on near-black #1E2229 with #F26B3A (`shell/theme/Theme.kt`). The canvas paper stays white; selection outlines, handles, the marquee and crop frames use the vermilion accent.
 7. **About** lists the licence (GPL-3.0-or-later), version, and an auto-generated third-party notice from the dependency list.
 
 ## Testing
@@ -47,6 +47,6 @@ As built in Task 19: `FingerMode { AUTO, DRAW, NAVIGATE }` lives in `drawing-too
 
 ## Decisions (owner, 2026-10-20)
 
-1. The placeholder green-check icon and colour stay until a design pass; a real icon is a release blocker listed in `SPEC.md`.
+1. The placeholder green-check icon and colour stay until a design pass; a real icon is a release blocker listed in `SPEC.md`. Done 2026-10-21: the owner chose the "ink swoosh" icon (a pressure stroke and a vermilion dot on warm paper), with a one-colour layer for themed icons. The owner also asked for the paper-on-ink variant in dark mode; launchers cache app icons and do not swap them with dark mode (checked on Pixel Launcher, even after a restart), so the icon is the same in both modes and the variant's colours are the app's dark theme and dark launch screen instead.
 2. Left-handed mode (mirrored toolbar) is a v1 setting.
 3. Finger mode AUTO as described in decision 4; the hand tool from `drawing-tools` is always available in addition.

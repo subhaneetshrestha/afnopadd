@@ -1,4 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#1E6F5C</color>
+    <!--
+        Launcher icon, variant A: ink on warm paper with a vermilion dot, in every mode. Launchers
+        cache an app's icon and do not swap it when dark mode toggles (Pixel Launcher keeps it even
+        across a restart), so a dark-mode icon would show unpredictably; the themed icon layer
+        (ic_launcher_monochrome) is Android's way to darken the home screen.
+    -->
+    <color name="ic_launcher_background">#FAF3E6</color>
+    <color name="ic_launcher_ink">#20242C</color>
+    <color name="ic_launcher_dot">#E4572E</color>
+
+    <!-- The window and launch screen behind the app: paper here, night ink in dark mode (variant D). -->
+    <color name="app_window_background">#FAF3E6</color>
 </resources>

@@ -193,7 +193,7 @@ Measured on the reference devices (an API 29+ phone and a stylus tablet on API 3
 
 - Application ID `io.github.subhaneetshrestha.afnopadd` (done 2026-10-20).
 - `LICENSE` is GPL-3.0-or-later (done); add SPDX headers if the owner wants them.
-- Real app icon and brand colour (placeholder green check until a design pass).
+- Real app icon and brand colour (placeholder green check until a design pass). Done 2026-10-21: the ink swoosh icon and its palette (SPEC-app-shell decision 6).
 - Fastlane metadata in `metadata/en-US/` (short and full description, screenshots, changelog).
 - Reproducible build check from a clean clone; no signing material in the repository.
 - Sheet package format v1 frozen and documented in `docs/format/`.

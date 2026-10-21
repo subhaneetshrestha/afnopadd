@@ -49,7 +49,7 @@ class SelectionOverlayTest {
     private fun ringWidthAt(centre: ScreenPoint): Int {
         val pixels = rule.onNodeWithTag("canvas").captureToImage().toPixelMap()
         val y = centre.y.toInt()
-        val xs = (centre.x.toInt() - 40..centre.x.toInt() + 40).filter { x -> x in 0 until pixels.width && pixels[x, y].let { it.blue > 0.6f && it.red < 0.5f } }
+        val xs = (centre.x.toInt() - 40..centre.x.toInt() + 40).filter { x -> x in 0 until pixels.width && pixels[x, y].let { it.red > 0.7f && it.blue < 0.45f } }
         return if (xs.isEmpty()) 0 else xs.last() - xs.first() + 1
     }
 
@@ -74,10 +74,10 @@ class SelectionOverlayTest {
         assertTrue("ring $at20x px at 20x, $at50x px at 50x", abs(at20x - at50x) <= 1)
     }
 
-    /** Counts bluish pixels along a horizontal run, where the dashed edge crosses. */
-    private fun bluishAlongRow(y: Int, xs: IntRange): Int {
+    /** Counts accent-coloured (vermilion) pixels along a horizontal run, where the dashed edge crosses. */
+    private fun accentAlongRow(y: Int, xs: IntRange): Int {
         val pixels = rule.onNodeWithTag("canvas").captureToImage().toPixelMap()
-        return xs.count { x -> pixels[x, y].let { it.blue > 0.6f && it.red < 0.5f } }
+        return xs.count { x -> pixels[x, y].let { it.red > 0.7f && it.blue < 0.45f } }
     }
 
     @Test
@@ -86,9 +86,9 @@ class SelectionOverlayTest {
         show(outline = WorldRect(-50.0, -25.0, 50.0, 25.0), marquee = null, zoom = 2.0)
         val pad = (6 * rule.density.density).toInt()
         val topEdge = 150 - pad
-        val dashed = (topEdge - 2..topEdge + 2).maxOf { bluishAlongRow(it, 210..390) }
+        val dashed = (topEdge - 2..topEdge + 2).maxOf { accentAlongRow(it, 210..390) }
         assertTrue("dashes along the top edge: $dashed", dashed in 40..170)
-        assertTrue("nothing inside the selection", bluishAlongRow(200, 220..380) == 0)
+        assertTrue("nothing inside the selection", accentAlongRow(200, 220..380) == 0)
     }
 
     @Test
@@ -97,7 +97,7 @@ class SelectionOverlayTest {
 
         val inside = rule.onNodeWithTag("canvas").captureToImage().toPixelMap()[300, 200]
         val outside = rule.onNodeWithTag("canvas").captureToImage().toPixelMap()[50, 50]
-        assertTrue("the marquee is tinted: $inside", inside.blue > inside.red + 0.03f)
-        assertTrue("outside is not: $outside", outside.blue <= outside.red + 0.01f)
+        assertTrue("the marquee is tinted: $inside", inside.red > inside.blue + 0.03f)
+        assertTrue("outside is not: $outside", outside.red <= outside.blue + 0.01f)
     }
 }

@@ -299,7 +299,8 @@ private fun DrawScope.drawCropFrame(corners: List<WorldPoint>, camera: Camera, v
 /** Lets instrumented tests see a canvas's tile layer (how many tiles it holds or had to patch). */
 internal val LocalTileLayerObserver = staticCompositionLocalOf<((TileLayer) -> Unit)?> { null }
 
-private val SELECTION_COLOR = Color(0xFF1E6FD9)
+/** The app's vermilion accent (its icon's dot), for selection outlines, handles, the marquee and crop frames. */
+private val SELECTION_COLOR = Color(0xFFE4572E)
 
 private fun visibleRect(camera: Camera, viewport: Viewport): WorldRect {
     val topLeft = CanvasMath.screenToWorld(camera, viewport, ScreenPoint(0.0, 0.0))
