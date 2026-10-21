@@ -15,6 +15,8 @@ import io.github.subhaneetshrestha.afnopadd.document.SheetStore
 import io.github.subhaneetshrestha.afnopadd.document.internal.RoomSheetStore
 import io.github.subhaneetshrestha.afnopadd.library.SheetLibrary
 import io.github.subhaneetshrestha.afnopadd.tools.ToolStyles
+import io.github.subhaneetshrestha.afnopadd.tools.ToolStylesStore
+import kotlinx.coroutines.launch
 import io.github.subhaneetshrestha.afnopadd.tools.presets.BuiltInPresets
 import io.github.subhaneetshrestha.afnopadd.library.internal.RoomSheetLibrary
 import io.github.subhaneetshrestha.afnopadd.library.internal.openLibraryDatabase
@@ -50,8 +52,10 @@ class AppContainer(val applicationContext: Context) {
 
     val thumbnails: ThumbnailWriter by lazy { ThumbnailWriter(renderer) }
 
-    /** Per-tool colour and width, kept for the whole session so they carry across sheets. */
-    val toolStyles: ToolStyles = ToolStyles(BuiltInPresets.defaultStyles)
+    /** Per-tool colour and width; they carry across sheets and, through [ToolStylesStore], across restarts. */
+    val toolStyles: ToolStyles = ToolStyles(BuiltInPresets.defaultStyles).also { styles ->
+        appScope.launch { ToolStylesStore(applicationContext.settingsDataStore).sync(styles) }
+    }
 
     val recentColors: RecentColorsStore by lazy { RecentColorsStore(applicationContext.settingsDataStore) }
 

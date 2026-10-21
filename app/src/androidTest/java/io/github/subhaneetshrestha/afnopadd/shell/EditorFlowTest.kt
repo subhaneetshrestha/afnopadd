@@ -43,11 +43,12 @@ class EditorFlowTest {
 
     private fun lastOpened(): SheetSummary? = runBlocking { container.library.lastOpened.first() }
 
-    /** Settings live in the app's real preferences file; every test starts and ends with the defaults (a finger draws). */
+    /** Settings and tool styles live in the app's real preferences file; every test starts and ends with the defaults (a finger draws, in black). */
     @Before
     @After
     fun resetSettings() {
         runBlocking { container.settings.update { Settings() } }
+        InstrumentationRegistry.getInstrumentation().runOnMainSync { container.toolStyles.reset() }
     }
 
     private fun camera(sheet: SheetSummary) = container.editorSessions.get(sheet.id.value)!!.camera.camera.value
