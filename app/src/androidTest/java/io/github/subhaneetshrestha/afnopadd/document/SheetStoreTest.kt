@@ -206,6 +206,28 @@ class SheetStoreTest {
     }
 
     @Test
+    fun aSheetLockedForAMomentIsWaitedForNotReportedAsAnError() = runBlocking {
+        val dir = File(root, "busy")
+        store.create(dir, title = "Busy").close()
+        // Another connection holds the database exclusively, as closing a sheet does while it
+        // compacts and checkpoints, and lets go shortly after.
+        val holder = BundledSQLiteDriver().open(File(dir, SheetStore.DATABASE_FILE_NAME).absolutePath)
+        holder.execSQL("PRAGMA locking_mode = EXCLUSIVE")
+        holder.execSQL("BEGIN EXCLUSIVE")
+        holder.execSQL("COMMIT")
+        val release = Thread {
+            Thread.sleep(300)
+            holder.close()
+        }.apply { start() }
+
+        try {
+            assertEquals("Busy", store.inspect(dir).meta.title)
+        } finally {
+            release.join()
+        }
+    }
+
+    @Test
     fun openingFiveThousandStrokesTakesUnderASecond() = runBlocking {
         val dir = File(root, "large")
         store.create(dir, title = "Large").close()
