@@ -144,9 +144,12 @@ jobs:
           adb shell settings put system screen_off_timeout 2147483647
           adb shell wm dismiss-keyguard
 
+      # Timing checks get four times the phone budget here instead of the local emulator's two: the
+      # shared runners measured a 50 ms target at 123 ms where a local emulator takes 56 ms.
       - name: Run this shard of the instrumented tests
         run: >-
           ./gradlew connectedDebugAndroidTest --stacktrace
+          -Pandroid.testInstrumentationRunnerArguments.perfBudgetScale=4
           -Pandroid.testInstrumentationRunnerArguments.numShards=${{ strategy.job-total }}
           -Pandroid.testInstrumentationRunnerArguments.shardIndex=${{ strategy.job-index }}
 
