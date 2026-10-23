@@ -36,6 +36,7 @@ class NavigationTest {
     @Test
     fun openingTheEditorThenPressingBackReturnsToTheLibrary() {
         composeRule.onNodeWithTag(LibraryTags.NEW_SHEET).performClick()
+        waitForEditor()
         composeRule.onNodeWithTag(ShellTags.EDITOR_SCREEN).assertIsDisplayed()
 
         composeRule.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
@@ -46,12 +47,18 @@ class NavigationTest {
     @Test
     fun editorSurvivesActivityRecreation() {
         composeRule.onNodeWithTag(LibraryTags.NEW_SHEET).performClick()
+        waitForEditor()
         composeRule.onNodeWithTag(ShellTags.EDITOR_SCREEN).assertIsDisplayed()
 
         composeRule.activityRule.scenario.recreate()
 
-        composeRule.waitUntil(timeoutMillis = 10_000) { composeRule.onAllNodesWithTag(ShellTags.EDITOR_SCREEN).fetchSemanticsNodes().isNotEmpty() }
+        waitForEditor()
         composeRule.onNodeWithTag(ShellTags.EDITOR_SCREEN).assertIsDisplayed()
+    }
+
+    /** The editor appears once its sheet is created or opened off the main thread, not on the click's frame. */
+    private fun waitForEditor() {
+        composeRule.waitUntil(timeoutMillis = 10_000) { composeRule.onAllNodesWithTag(ShellTags.EDITOR_SCREEN).fetchSemanticsNodes().isNotEmpty() }
     }
 
     /** app-shell spec acceptance 2: rotating keeps the sheet (with its undo history), the camera and the tool. */

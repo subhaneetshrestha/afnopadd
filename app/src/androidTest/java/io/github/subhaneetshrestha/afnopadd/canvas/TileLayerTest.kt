@@ -240,11 +240,12 @@ class TileLayerTest {
                 }
             }
         }
+        // One rendered tile is enough to show the release; waiting for more cost 50 s on CI's software GPU.
         val deadline = System.currentTimeMillis() + 60_000
         while (System.currentTimeMillis() < deadline) {
             var held = 0
             instrumentation.runOnMainSync { held = layer?.heldCount ?: 0 }
-            if (held > 10) break
+            if (held > 0) break
             Thread.sleep(50)
         }
 
