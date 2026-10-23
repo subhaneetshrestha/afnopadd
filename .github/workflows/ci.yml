@@ -1,6 +1,7 @@
 # Quality gates for every pull request into main and every push to main, and the APK built from
 # main. A pull request is ready to merge only when "Unit tests and Lint" and "Instrumented tests"
-# both pass; main then gets the same checks again and, when they pass, a debug APK.
+# both pass; main then gets the same checks again and, when they pass, a debug APK published as a
+# GitHub pre-release.
 name: CI
 
 on:
@@ -138,6 +139,9 @@ jobs:
     needs: [check, instrumented]
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Creating the tag and the release needs write access; every other job stays read-only.
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v7
 
@@ -168,3 +172,16 @@ jobs:
           name: afnopadd-debug-apk
           path: out/*.apk
           retention-days: 30
+
+      # One pre-release per commit on main, tagged build-<sha>, so every build stays installable.
+      # It is a pre-release because the APK carries the debug key; signed releases come with Task 31.
+      - name: Publish a GitHub release with the APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          short="${GITHUB_SHA::7}"
+          gh release create "build-${short}" out/*.apk \
+            --target "$GITHUB_SHA" \
+            --title "Build ${short}" \
+            --notes "Debug build of ${GITHUB_SHA} from main, after unit, Lint and instrumented tests passed. Signed with the debug key, for testing only." \
+            --prerelease
