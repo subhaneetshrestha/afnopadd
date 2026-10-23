@@ -27,7 +27,7 @@ import kotlinx.coroutines.CancellationException
  *
  * The one exception: when [secondPointerConstrains] says so (shape tools), a second pointer landing
  * during a drawing gesture is a held modifier instead of a pinch. The drawing pointer keeps going
- * and its events carry `constrain = true` while another pointer is down (SPEC-drawing-tools
+ * and its events carry `constrain = true` while another pointer is down (drawing-tools spec
  * decision 5). Before a drawing gesture starts, two pointers still pinch as usual.
  */
 internal fun Modifier.canvasGestures(

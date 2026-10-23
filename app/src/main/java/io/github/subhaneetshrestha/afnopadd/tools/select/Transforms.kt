@@ -21,7 +21,7 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * Uniform scale and rotation of elements about a world pivot (SPEC-drawing-tools decision 7).
+ * Uniform scale and rotation of elements about a world pivot (drawing-tools spec decision 7).
  * Element geometry is stored relative to the anchor, so each transform moves the anchor about the
  * pivot and then changes the local geometry about the anchor; frame levels stay as they are.
  *

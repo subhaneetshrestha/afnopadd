@@ -1,6 +1,6 @@
 # Spec: canvas-engine
 
-Status: **APPROVED by the owner on 2026-10-20.** Module id `canvas-engine`. Depends on: `sheet-document`. Package: `io.github.subhaneetshrestha.afnopadd.canvas`. Project-wide rules in `SPEC.md` apply.
+Status: **APPROVED by the owner on 2026-10-20.** Module id `canvas-engine`. Depends on: `sheet-document`. Package: `io.github.subhaneetshrestha.afnopadd.canvas`. Project-wide rules in `docs/product/spec.md` apply.
 
 ## Objective
 

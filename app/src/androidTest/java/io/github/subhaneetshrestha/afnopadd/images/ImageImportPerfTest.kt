@@ -23,7 +23,7 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlin.concurrent.thread
 
 /**
- * SPEC-image-board success criterion 1: twenty 12-megapixel photos import in under 10 s with peak
+ * image-board spec success criterion 1: twenty 12-megapixel photos import in under 10 s with peak
  * memory under 300 MB. Half the photos carry EXIF orientation 6, as portrait phone photos do, so
  * they take the full decode-and-re-encode path; the rest are stored as they came.
  */

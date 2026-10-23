@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 
 /**
- * The image actions of the selection's context bar (SPEC-image-board): crop (entering crop mode
+ * The image actions of the selection's context bar (image-board spec): crop (entering crop mode
  * is the editor's job, through [onCrop]), reset crop, and arrange in row. Each change is one
  * undoable transaction; enabled states follow the selection and the sheet in [scope].
  */

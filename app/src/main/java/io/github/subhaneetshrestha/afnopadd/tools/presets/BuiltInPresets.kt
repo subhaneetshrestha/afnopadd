@@ -27,7 +27,7 @@ object StrokeParams {
 }
 
 /**
- * The v1 stroke tools (SPEC-drawing-tools.md decision 2). Pencil is a pen preset until Ink ships
+ * The v1 stroke tools (drawing-tools spec decision 2). Pencil is a pen preset until Ink ships
  * a stable textured pencil; brush is a wide marker; the highlighter keeps a fixed 40 % opacity.
  */
 object BuiltInPresets {

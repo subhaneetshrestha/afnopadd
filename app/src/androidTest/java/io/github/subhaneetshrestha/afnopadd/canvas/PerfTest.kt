@@ -37,7 +37,7 @@ import java.io.File
 import java.util.Collections
 
 /**
- * SPEC.md success criteria 1 to 3 on the shared fixture (5,000 strokes, 20 images): opening the
+ * docs/product/spec.md success criteria 1 to 3 on the shared fixture (5,000 strokes, 20 images): opening the
  * sheet, drawing a 1,000-point stroke on it, and panning and zooming at every zoom bucket. Times
  * are logged for `docs/checklists/perf-2026.md`; the asserted limits are the spec's, doubled on an
  * emulator ([PerfBudget]). Criterion 4 (zoom range and stability) is `DeepZoomRenderingTest`.

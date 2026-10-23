@@ -3,7 +3,7 @@ package io.github.subhaneetshrestha.afnopadd.tools.presets
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 
-/** A parameter value in a preset; the shapes later JSON presets (SPEC-tool-config.md, Layer 2) will use. */
+/** A parameter value in a preset; the shapes later JSON presets (tool-config spec, Layer 2) will use. */
 sealed interface ParamValue {
     data class Const(val value: Double) : ParamValue
     data class Text(val value: String) : ParamValue

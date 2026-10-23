@@ -17,7 +17,7 @@ import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * Renders tiles on one background thread (SPEC-canvas-engine decision 5): the tile's elements are
+ * Renders tiles on one background thread (canvas-engine spec decision 5): the tile's elements are
  * drawn by a [RegionPainter] onto a transparent software bitmap, which is then copied into a
  * hardware bitmap so drawing it costs the UI thread next to nothing. Results come back on the main
  * thread. The thread keeps its own spatial index, synced to whichever snapshot a tile is drawn from.

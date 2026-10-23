@@ -15,11 +15,11 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import java.io.IOException
 
-/** Where the toolbars go: AUTO is a bottom bar on compact widths and a side rail on wider ones (SPEC-app-shell decision 5). */
+/** Where the toolbars go: AUTO is a bottom bar on compact widths and a side rail on wider ones (app-shell spec decision 5). */
 enum class ToolbarPlacement { AUTO, BOTTOM, SIDE }
 
 /**
- * The user's settings (SPEC-app-shell), plus [stylusSeen], the persisted flag behind finger mode
+ * The user's settings (app-shell spec), plus [stylusSeen], the persisted flag behind finger mode
  * AUTO: once any stylus has touched the canvas on this device, a single finger pans.
  */
 data class Settings(

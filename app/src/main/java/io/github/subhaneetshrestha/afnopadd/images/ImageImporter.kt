@@ -23,7 +23,7 @@ import kotlin.random.Random
 /**
  * Where imported images go: centred on [center] in the zoom frame [frameLevel], each fitted to a
  * square of [maxSizeFraction] of the viewport's shorter side ([shortSideWorld], in world units),
- * several in a row [gapWorld] apart (SPEC-image-board decision 4).
+ * several in a row [gapWorld] apart (image-board spec decision 4).
  */
 data class Placement(
     val center: WorldPoint,
@@ -68,7 +68,7 @@ interface ImageImporter {
 
 /**
  * [ImageImporter] on the platform decoders. Sources are handled one at a time on the IO dispatcher,
- * so at most one decoded bitmap (bounded by the 4,096 px cap) is in memory (SPEC-image-board
+ * so at most one decoded bitmap (bounded by the 4,096 px cap) is in memory (image-board spec
  * decision 7). Picker URI grants are only used while importing, never kept.
  */
 class AndroidImageImporter(

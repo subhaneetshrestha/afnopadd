@@ -1,6 +1,6 @@
 # Spec: sheet-library
 
-Status: **APPROVED by the owner on 2026-10-20.** Module id `sheet-library`. Depends on: `sheet-document`. Package: `io.github.subhaneetshrestha.afnopadd.library`. Project-wide rules in `SPEC.md` apply.
+Status: **APPROVED by the owner on 2026-10-20.** Module id `sheet-library`. Depends on: `sheet-document`. Package: `io.github.subhaneetshrestha.afnopadd.library`. Project-wide rules in `docs/product/spec.md` apply.
 
 ## Objective
 

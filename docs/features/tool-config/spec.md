@@ -1,6 +1,6 @@
 # Spec: tool-config (later phase, outline)
 
-Status: **OUTLINE, direction approved by the owner on 2026-10-20.** Module id `tool-config`. Depends on: `drawing-tools`. Package: `io.github.subhaneetshrestha.afnopadd.toolconfig`. Project-wide rules in `SPEC.md` apply. This outline records the contract `drawing-tools` must honour in v1; a full spec is written when the phase is scheduled.
+Status: **OUTLINE, direction approved by the owner on 2026-10-20.** Module id `tool-config`. Depends on: `drawing-tools`. Package: `io.github.subhaneetshrestha.afnopadd.toolconfig`. Project-wide rules in `docs/product/spec.md` apply. This outline records the contract `drawing-tools` must honour in v1; a full spec is written when the phase is scheduled.
 
 ## Objective
 

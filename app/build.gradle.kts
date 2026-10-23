@@ -49,7 +49,7 @@ android {
     }
 
     lint {
-        // The quality bar from SPEC.md: a Lint warning fails the build.
+        // The quality bar from docs/product/spec.md: a Lint warning fails the build.
         warningsAsErrors = true
         abortOnError = true
     }

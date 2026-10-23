@@ -13,7 +13,7 @@ import java.io.File
 import kotlin.math.max
 
 /**
- * Draws images on screen (SPEC-image-board decision 6). Each asset keeps one bitmap, sized to the
+ * Draws images on screen (image-board spec decision 6). Each asset keeps one bitmap, sized to the
  * [ImageBuckets] bucket of how large the image is on screen; when the bucket changes (a zoom), a
  * new size is requested and the old bitmap is drawn, scaled, until it arrives, so pinching never
  * waits on a decode. The image is drawn in its own frame units: turned about its centre, clipped

@@ -13,7 +13,7 @@ import kotlin.math.sin
 
 /**
  * Crop rectangles live in the image's own frame units, from (0, 0) at its unturned top-left corner
- * to its size, so a crop survives moving, scaling and turning the image (SPEC-image-board decision 5).
+ * to its size, so a crop survives moving, scaling and turning the image (image-board spec decision 5).
  */
 object CropMath {
 

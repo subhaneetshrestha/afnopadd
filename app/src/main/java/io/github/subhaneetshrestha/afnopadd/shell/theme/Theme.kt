@@ -90,7 +90,7 @@ private val DarkColors = darkColorScheme(
 /**
  * Material 3 theme following the system light/dark setting. Dynamic colour is deliberately off so
  * the app looks the same on every device and in screenshots. The canvas's own paper stays white:
- * colours drawn on it must look true, whatever the theme (SPEC-app-shell decision 6).
+ * colours drawn on it must look true, whatever the theme (app-shell spec decision 6).
  */
 @Composable
 fun AfnopaddTheme(

@@ -17,7 +17,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * Removes whole strokes and shapes that the eraser path touches (SPEC-drawing-tools.md decision 6).
+ * Removes whole strokes and shapes that the eraser path touches (drawing-tools spec decision 6).
  * Images are never erased; they are deleted through selection. Partial stroke erasing waits for Ink 1.1.
  */
 class EraserTool : Tool {
