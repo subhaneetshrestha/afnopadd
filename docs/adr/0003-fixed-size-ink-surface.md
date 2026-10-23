@@ -33,7 +33,7 @@ editor and in other tests were the same race; an overloaded host made it far mor
 ## Consequences
 
 - With the fix, ten consecutive `EditorFlowTest` runs on the emulator had no native crash
-  (results recorded in Task 16b in `tasks/todo.md`).
+  (results recorded in Task 16b in `docs/features/canvas-engine/tasks.md`).
 - Window-level resizes (rotation without recreation, split screen, freeform windows, the soft
   keyboard if a future text tool resizes the window) can still hit the Ink race. Follow-ups:
   check Ink 1.1 when it is stable and retest the bare-resize repro; until then, prefer

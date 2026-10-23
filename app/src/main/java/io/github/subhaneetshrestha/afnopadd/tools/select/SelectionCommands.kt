@@ -10,7 +10,7 @@ import io.github.subhaneetshrestha.afnopadd.tools.Command
 import io.github.subhaneetshrestha.afnopadd.tools.ToolContext
 
 /**
- * The selection's context bar (SPEC-drawing-tools decision 7): delete, duplicate, bring to front,
+ * The selection's context bar (drawing-tools spec decision 7): delete, duplicate, bring to front,
  * send to back. Each is one undoable transaction, is enabled only while something is selected, and
  * acts on the selected elements that are still on the sheet. Reordering gives only the selected
  * elements new fractional indexes, keeping their order among themselves.

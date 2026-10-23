@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlin.math.roundToLong
 
 /**
- * The zoom commands (SPEC-drawing-tools decision 9): in and out by 1.5x around the viewport
+ * The zoom commands (drawing-tools spec decision 9): in and out by 1.5x around the viewport
  * centre, fit to all content, and back to 1x. Each computes a target camera and hands it to
  * [animateTo], which the editor backs with a 150 ms [io.github.subhaneetshrestha.afnopadd.canvas.CameraAnimator].
  * [contentBounds] is null for an empty sheet, which fit treats as "back to the origin at 1x".

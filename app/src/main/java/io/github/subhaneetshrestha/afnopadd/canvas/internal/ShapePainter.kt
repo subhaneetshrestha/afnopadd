@@ -15,7 +15,7 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
- * Draws shapes as anti-aliased vector paths (SPEC-canvas-engine decision 8). The path is built in
+ * Draws shapes as anti-aliased vector paths (canvas-engine spec decision 8). The path is built in
  * the shape's frame units, then moved to the target's pixels and stroked at the scaled width, so it
  * is tessellated at its final size and stays crisp at any zoom. Not thread-safe; one per renderer.
  */

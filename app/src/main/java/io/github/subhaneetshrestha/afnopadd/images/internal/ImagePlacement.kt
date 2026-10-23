@@ -5,7 +5,7 @@ import io.github.subhaneetshrestha.afnopadd.document.LocalSize
 import io.github.subhaneetshrestha.afnopadd.document.WorldRect
 import io.github.subhaneetshrestha.afnopadd.images.Placement
 
-/** Default placement of imported images (SPEC-image-board decision 4). Pure, so it is unit-tested on the JVM. */
+/** Default placement of imported images (image-board spec decision 4). Pure, so it is unit-tested on the JVM. */
 internal object ImagePlacement {
 
     data class PixelSize(val width: Int, val height: Int)

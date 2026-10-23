@@ -76,7 +76,7 @@ internal class StrokeCache(private val maxBytes: Long = DEFAULT_MAX_BYTES) {
     }
 
     /**
-     * Deep-zoom variants (SPEC-canvas-engine decision 4), kept apart from the plain meshes so they
+     * Deep-zoom variants (canvas-engine spec decision 4), kept apart from the plain meshes so they
      * never push them out, under their own byte budget and the same rule: what the current frame
      * drew is not evicted for it.
      */

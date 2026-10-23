@@ -1,6 +1,6 @@
 # ADR 0001: Dependency baseline for v1
 
-Date: 2026-10-20. Status: accepted (owner approved the non-Google libraries on 2026-10-20, see `SPEC.md` decisions).
+Date: 2026-10-20. Status: accepted (owner approved the non-Google libraries on 2026-10-20, see `docs/product/spec.md` decisions).
 
 ## Context
 
@@ -14,10 +14,10 @@ Afnopadd ships through F-Droid under GPL-3.0-or-later with no network access. Ev
 | androidx.activity:activity-compose | 1.13.0 | Apache-2.0 | `ComponentActivity`, Photo Picker contracts, back handling |
 | androidx.compose BOM | 2026.09.00 | Apache-2.0 | UI toolkit; versions of ui, material3, tooling, ui-test |
 | androidx.lifecycle:lifecycle-runtime-compose, lifecycle-viewmodel-compose | 2.11.0 | Apache-2.0 | `collectAsStateWithLifecycle`, screen view models |
-| androidx.navigation3:navigation3-runtime, navigation3-ui | 1.2.0 | Apache-2.0 | Saveable back stack between library and editor (`SPEC-app-shell.md`) |
-| androidx.ink:ink-authoring, ink-authoring-compose, ink-brush, ink-brush-compose, ink-geometry, ink-geometry-compose, ink-rendering, ink-strokes | 1.0.0 | Apache-2.0 | Stroke engine (`SPEC-canvas-engine.md`); `ink-storage` is not used because points are stored in Afnopadd's own format |
+| androidx.navigation3:navigation3-runtime, navigation3-ui | 1.2.0 | Apache-2.0 | Saveable back stack between library and editor (`docs/features/app-shell/spec.md`) |
+| androidx.ink:ink-authoring, ink-authoring-compose, ink-brush, ink-brush-compose, ink-geometry, ink-geometry-compose, ink-rendering, ink-strokes | 1.0.0 | Apache-2.0 | Stroke engine (`docs/features/canvas-engine/spec.md`); `ink-storage` is not used because points are stored in Afnopadd's own format |
 | androidx.input:input-motionprediction | 1.0.0 | Apache-2.0 | Stylus motion prediction, recommended by Ink |
-| androidx.room:room-runtime, room-compiler (KSP), room-gradle-plugin | 2.8.5 | Apache-2.0 | Per-sheet and library databases (`SPEC-sheet-document.md`, `SPEC-sheet-library.md`) |
+| androidx.room:room-runtime, room-compiler (KSP), room-gradle-plugin | 2.8.5 | Apache-2.0 | Per-sheet and library databases (`docs/features/sheet-document/spec.md`, `docs/features/sheet-library/spec.md`) |
 | androidx.sqlite:sqlite-bundled | 2.7.1 | Apache-2.0 | One modern SQLite on every supported device |
 | androidx.datastore:datastore-preferences | 1.2.1 | Apache-2.0 | Settings and small preferences |
 | androidx.exifinterface:exifinterface | 1.4.2 | Apache-2.0 | Bake photo orientation at import |
@@ -35,5 +35,5 @@ Build configuration decided alongside: Lint runs with `warningsAsErrors` and `ab
 ## Consequences
 
 - No `INTERNET` permission is introduced by any of these; Coil's network artifacts are deliberately excluded.
-- Room cannot be constructed in plain JVM unit tests inside an Android module without a `Context`, so Room-backed tests live in `app/src/androidTest` and need a device or emulator. Pure document logic stays JVM-testable behind the `SheetWriter` boundary (`SPEC-sheet-document.md`).
+- Room cannot be constructed in plain JVM unit tests inside an Android module without a `Context`, so Room-backed tests live in `app/src/androidTest` and need a device or emulator. Pure document logic stays JVM-testable behind the `SheetWriter` boundary (`docs/features/sheet-document/spec.md`).
 - Any new dependency outside this table requires a new ADR and, if outside AndroidX/Google, the owner's approval.

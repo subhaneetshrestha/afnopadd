@@ -23,7 +23,7 @@ fun interface ImageBitmapLoader {
 }
 
 /**
- * [ImageBitmapLoader] through Coil 3 (SPEC-image-board decision 6): decoded off the main thread
+ * [ImageBitmapLoader] through Coil 3 (image-board spec decision 6): decoded off the main thread
  * into hardware bitmaps, with Coil's memory cache keyed on file and size, so zooming back to a
  * bucket seen before is instant.
  */

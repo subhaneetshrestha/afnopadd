@@ -10,7 +10,7 @@ import kotlin.math.pow
 internal data class TileKey(val level: Int, val x: Long, val y: Long)
 
 /**
- * The geometry of the tile pyramid (SPEC-canvas-engine decision 5): square [TILE_PX] tiles per
+ * The geometry of the tile pyramid (canvas-engine spec decision 5): square [TILE_PX] tiles per
  * power-of-two level, the level at or above the camera's zoom (so a tile is drawn scaled by 0.5x
  * to 1x), and when tiles are worth it at all.
  */
@@ -67,7 +67,7 @@ internal object TileGrid {
     fun shouldTile(visibleElements: Int, hairlineStrokes: Int, visibleStrokes: Int, deepStrokes: Int = 0): Boolean =
         deepStrokes == 0 && (visibleElements > MAX_VECTOR_ELEMENTS || (visibleStrokes > 0 && hairlineStrokes * 2 > visibleStrokes))
 
-    /** A tenth of the app's memory class, between 48 and 128 MB (SPEC-canvas-engine decision 3, owner). */
+    /** A tenth of the app's memory class, between 48 and 128 MB (canvas-engine spec decision 3, owner). */
     fun budgetBytes(memoryClassMb: Int): Long = (memoryClassMb / 10L).coerceIn(48L, 128L) shl 20
 }
 

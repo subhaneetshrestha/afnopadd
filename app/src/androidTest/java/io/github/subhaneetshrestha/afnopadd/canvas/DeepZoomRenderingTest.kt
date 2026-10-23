@@ -33,7 +33,7 @@ import kotlin.math.abs
 import kotlin.random.Random
 
 /**
- * SPEC.md success criterion 4 and Task 25: a stroke drawn at 1x and viewed at 100,000x keeps a
+ * docs/product/spec.md success criterion 4 and Task 25: a stroke drawn at 1x and viewed at 100,000x keeps a
  * smooth edge exactly where its geometry puts it, and does not jitter against its neighbours as
  * the view moves.
  */

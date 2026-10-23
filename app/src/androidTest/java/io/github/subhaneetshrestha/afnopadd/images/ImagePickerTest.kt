@@ -95,7 +95,7 @@ class ImagePickerTest {
         assertTrue(picked.isEmpty())
     }
 
-    /** SPEC-image-board success criterion 5, against the merged manifest the app actually ships. */
+    /** image-board spec success criterion 5, against the merged manifest the app actually ships. */
     @Test
     fun theAppAsksForNoImageCameraOrStoragePermission() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext

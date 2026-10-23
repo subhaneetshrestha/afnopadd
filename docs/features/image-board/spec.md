@@ -1,6 +1,6 @@
 # Spec: image-board
 
-Status: **APPROVED by the owner on 2026-10-20.** Module id `image-board`. Depends on: `canvas-engine`, `sheet-document`, `drawing-tools`. Package: `io.github.subhaneetshrestha.afnopadd.images`. Project-wide rules in `SPEC.md` apply.
+Status: **APPROVED by the owner on 2026-10-20.** Module id `image-board`. Depends on: `canvas-engine`, `sheet-document`, `drawing-tools`. Package: `io.github.subhaneetshrestha.afnopadd.images`. Project-wide rules in `docs/product/spec.md` apply.
 
 ## Objective
 

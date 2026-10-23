@@ -18,7 +18,7 @@ import java.io.File
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 
-/** Where images can come from (SPEC-image-board decision 1); none of them needs a permission. */
+/** Where images can come from (image-board spec decision 1); none of them needs a permission. */
 sealed interface ImageSource {
     data object PhotoPicker : ImageSource
     data object Documents : ImageSource

@@ -30,7 +30,7 @@ class CameraAnimator(private val controller: CameraController, private val durat
     private fun easeInOut(t: Double) = (1 - cos(PI * t)) / 2
 
     companion object {
-        /** SPEC-drawing-tools decision 9. */
+        /** drawing-tools spec decision 9. */
         const val DEFAULT_DURATION_MILLIS = 150L
     }
 }

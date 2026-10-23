@@ -12,7 +12,7 @@ import kotlin.math.pow
 
 /**
  * How a stroke is drawn when the camera is far deeper than the frame it was drawn in
- * (SPEC-canvas-engine decision 4). The relative zoom is the frame transform's scale: screen pixels
+ * (canvas-engine spec decision 4). The relative zoom is the frame transform's scale: screen pixels
  * per unit of the stroke's own frame.
  *
  * - Up to [FINE_ABOVE]: the stroke's own mesh.

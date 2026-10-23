@@ -33,7 +33,7 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
-/** A drag-to-create shape tool (SPEC-drawing-tools decision 5): one [ShapeElement] per drag, no fill. */
+/** A drag-to-create shape tool (drawing-tools spec decision 5): one [ShapeElement] per drag, no fill. */
 class ShapeTool(
     override val id: String,
     private val kind: ShapeKind,

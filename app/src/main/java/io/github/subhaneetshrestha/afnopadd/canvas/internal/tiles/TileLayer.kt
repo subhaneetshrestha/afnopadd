@@ -23,7 +23,7 @@ import java.io.File
 import kotlin.math.roundToInt
 
 /**
- * The tile pyramid on screen (SPEC-canvas-engine decision 5). When [shouldTile] says a view is too
+ * The tile pyramid on screen (canvas-engine spec decision 5). When [shouldTile] says a view is too
  * crowded or too fine for vectors, [draw] paints it from 256 px tiles of the nearest power-of-two
  * level. A tile that is not ready yet, or was invalidated by a transaction, or lies under an element
  * hidden by a gesture in progress (the eraser's), is drawn as vectors clipped to its square, so the

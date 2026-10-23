@@ -1,6 +1,6 @@
 # Spec: app-shell
 
-Status: **APPROVED by the owner on 2026-10-20.** Module id `app-shell`. Depends on: `sheet-library`, `drawing-tools`, `image-board`, `sharing`. Package: `io.github.subhaneetshrestha.afnopadd.shell`. Project-wide rules in `SPEC.md` apply.
+Status: **APPROVED by the owner on 2026-10-20.** Module id `app-shell`. Depends on: `sheet-library`, `drawing-tools`, `image-board`, `sharing`. Package: `io.github.subhaneetshrestha.afnopadd.shell`. Project-wide rules in `docs/product/spec.md` apply.
 
 ## Objective
 
@@ -47,6 +47,6 @@ As built in Task 19: `FingerMode { AUTO, DRAW, NAVIGATE }` lives in `drawing-too
 
 ## Decisions (owner, 2026-10-20)
 
-1. The placeholder green-check icon and colour stay until a design pass; a real icon is a release blocker listed in `SPEC.md`. Done 2026-10-21: the owner chose the "ink swoosh" icon (a pressure stroke and a vermilion dot on warm paper), with a one-colour layer for themed icons. The owner also asked for the paper-on-ink variant in dark mode; launchers cache app icons and do not swap them with dark mode (checked on Pixel Launcher, even after a restart), so the icon is the same in both modes and the variant's colours are the app's dark theme and dark launch screen instead.
+1. The placeholder green-check icon and colour stay until a design pass; a real icon is a release blocker listed in `docs/product/spec.md`. Done 2026-10-21: the owner chose the "ink swoosh" icon (a pressure stroke and a vermilion dot on warm paper), with a one-colour layer for themed icons. The owner also asked for the paper-on-ink variant in dark mode; launchers cache app icons and do not swap them with dark mode (checked on Pixel Launcher, even after a restart), so the icon is the same in both modes and the variant's colours are the app's dark theme and dark launch screen instead.
 2. Left-handed mode (mirrored toolbar) is a v1 setting.
 3. Finger mode AUTO as described in decision 4; the hand tool from `drawing-tools` is always available in addition.

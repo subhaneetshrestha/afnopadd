@@ -26,7 +26,7 @@ internal class NormalizedImage(val file: File, val mime: String, val width: Int,
 }
 
 /**
- * Turns a picked source into an image fit to store (SPEC-image-board decision 3): upright, at most
+ * Turns a picked source into an image fit to store (image-board spec decision 3): upright, at most
  * [MAX_EDGE_PX] on its long edge, in a format every Android device decodes.
  *
  * The source is first copied to a private temporary file, since picker streams may only be read
@@ -134,7 +134,7 @@ internal class ImageNormalizer(
     }
 
     companion object {
-        /** The stored long edge never exceeds this (owner decision 2 in SPEC-image-board). */
+        /** The stored long edge never exceeds this (owner decision 2 in image-board spec). */
         const val MAX_EDGE_PX = 4_096
 
         /** Far above any photo (a 48 MP JPEG is about 25 MB), well below what would fill a phone's cache. */

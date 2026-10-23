@@ -1,7 +1,7 @@
 # Spec: Afnopadd
 
 Status: **APPROVED by the owner on 2026-10-20** (decisions recorded at the end of this document).
-This is the project-wide spec. Each capability module in `CAPABILITY-MAP.md` has its own `SPEC-<module>.md` that inherits everything here and adds module scope, contracts, and success criteria. Research behind the decisions: `docs/research/2026-10-20-infinite-canvas-research.md`.
+This is the project-wide spec. Each capability module in `docs/product/capability-map.md` has its own `docs/features/<module>/spec.md` that inherits everything here and adds module scope, contracts, and success criteria. Research behind the decisions: `docs/research/2026-10-20-infinite-canvas-research.md`.
 
 ## Objective
 
@@ -81,12 +81,13 @@ app/src/test/java/...             JVM unit tests, package mirrors main
 app/src/test/resources/           Golden files: sheet packages per format version, layout JSON
 app/src/androidTest/java/...      Instrumented tests (Room on device, Compose UI, performance)
 app/schemas/                      Room schema history (committed, never edited by hand)
+docs/README.md                    Index of the docs and the conventions for specs and tasks
+docs/product/                     spec.md (this file), capability-map.md, roadmap.md (plan, checkpoints)
+docs/features/<module>/           spec.md and tasks.md for each capability module
 docs/research/                    Research notes
 docs/adr/                         Architecture decision records (NNNN-title.md)
 docs/format/                      The sheet package format, versioned (public contract once sharing ships)
 docs/checklists/                  Manual release checklist
-tasks/                            plan.md and todo.md produced by the planning phase
-CAPABILITY-MAP.md, SPEC.md, SPEC-<module>.md
 ```
 
 Each capability package exposes a small public API (interfaces and data types in the package root) and keeps implementation in an `internal` sub-package. Dependencies between packages follow the capability map's arrows only; reviews enforce it.
@@ -193,7 +194,7 @@ Measured on the reference devices (an API 29+ phone and a stylus tablet on API 3
 
 - Application ID `io.github.subhaneetshrestha.afnopadd` (done 2026-10-20).
 - `LICENSE` is GPL-3.0-or-later (done); add SPDX headers if the owner wants them.
-- Real app icon and brand colour (placeholder green check until a design pass). Done 2026-10-21: the ink swoosh icon and its palette (SPEC-app-shell decision 6).
+- Real app icon and brand colour (placeholder green check until a design pass). Done 2026-10-21: the ink swoosh icon and its palette (app-shell spec decision 6).
 - Fastlane metadata in `metadata/en-US/` (short and full description, screenshots, changelog).
 - Reproducible build check from a clean clone; no signing material in the repository.
 - Sheet package format v1 frozen and documented in `docs/format/`.
@@ -208,7 +209,7 @@ Measured on the reference devices (an API 29+ phone and a stylus tablet on API 3
 6. Zoom range 0.001x to 100,000x.
 7. Stroke points are stored in Afnopadd's own compact format, not Ink's protobuf.
 8. Imported photos are normalised to at most 4,096 px on the long edge; the original file is not kept.
-9. Module-level proposals in each `SPEC-<module>.md` are adopted as written and recorded in their Decisions sections.
+9. Module-level proposals in each `docs/features/<module>/spec.md` are adopted as written and recorded in their Decisions sections.
 
 ## Open questions
 

@@ -54,7 +54,7 @@ class NavigationTest {
         composeRule.onNodeWithTag(ShellTags.EDITOR_SCREEN).assertIsDisplayed()
     }
 
-    /** SPEC-app-shell acceptance 2: rotating keeps the sheet (with its undo history), the camera and the tool. */
+    /** app-shell spec acceptance 2: rotating keeps the sheet (with its undo history), the camera and the tool. */
     @Test
     fun recreationKeepsTheOpenSheetItsCameraAndTheTool() {
         val sessions = (InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as AfnopaddApp).container.editorSessions

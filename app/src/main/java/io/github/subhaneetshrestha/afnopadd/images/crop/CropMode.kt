@@ -17,7 +17,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlin.math.hypot
 
 /**
- * Crop mode for one image (SPEC-image-board decision 5): the crop rectangle, in the image's own
+ * Crop mode for one image (image-board spec decision 5): the crop rectangle, in the image's own
  * units, has a handle on each corner. Dragging a corner moves it; dragging inside the rectangle
  * moves the whole crop; either is clamped to the image and to [MIN_SIZE_DP], previewed through
  * [pendingCrop], and stored as one "Crop" transaction when the pointer lifts. The crop is stored,

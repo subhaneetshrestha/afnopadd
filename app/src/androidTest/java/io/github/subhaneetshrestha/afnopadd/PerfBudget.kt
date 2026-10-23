@@ -3,7 +3,7 @@ package io.github.subhaneetshrestha.afnopadd
 import android.os.Build
 
 /**
- * Timing targets in SPEC.md are for the reference phone. Emulators share the host CPU with
+ * Timing targets in docs/product/spec.md are for the reference phone. Emulators share the host CPU with
  * everything else running, so instrumented timing checks get twice the budget there; the
  * authoritative device measurements are taken in Task 25.
  */

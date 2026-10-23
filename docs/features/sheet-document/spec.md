@@ -1,6 +1,6 @@
 # Spec: sheet-document
 
-Status: **APPROVED by the owner on 2026-10-20.** Module id `sheet-document` in `CAPABILITY-MAP.md`. Depends on: nothing. Package: `io.github.subhaneetshrestha.afnopadd.document`. Project-wide rules in `SPEC.md` apply.
+Status: **APPROVED by the owner on 2026-10-20.** Module id `sheet-document` in `docs/product/capability-map.md`. Depends on: nothing. Package: `io.github.subhaneetshrestha.afnopadd.document`. Project-wide rules in `docs/product/spec.md` apply.
 
 ## Objective
 

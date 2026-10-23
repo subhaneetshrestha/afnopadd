@@ -26,7 +26,7 @@ import kotlin.math.atan2
 import kotlin.math.hypot
 
 /**
- * Selects, moves, scales and rotates elements (SPEC-drawing-tools decision 7). The selection itself
+ * Selects, moves, scales and rotates elements (drawing-tools spec decision 7). The selection itself
  * lives in [ToolContext.selection], shared with the selection commands and the canvas overlay.
  */
 class SelectTool : Tool {

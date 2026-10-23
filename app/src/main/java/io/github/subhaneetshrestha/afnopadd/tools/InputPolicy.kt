@@ -3,7 +3,7 @@ package io.github.subhaneetshrestha.afnopadd.tools
 import io.github.subhaneetshrestha.afnopadd.canvas.PointerKind
 import io.github.subhaneetshrestha.afnopadd.canvas.PointerRole
 
-/** What a single finger does: AUTO draws until a stylus has been seen on the device, then pans (SPEC-app-shell decision 4). */
+/** What a single finger does: AUTO draws until a stylus has been seen on the device, then pans (app-shell spec decision 4). */
 enum class FingerMode { AUTO, DRAW, NAVIGATE }
 
 /**
@@ -13,7 +13,7 @@ enum class FingerMode { AUTO, DRAW, NAVIGATE }
 object InputPolicy {
 
     fun roleFor(kind: PointerKind, toolCapabilities: Set<ToolCapability>, fingerMode: FingerMode, stylusSeen: Boolean): PointerRole = when {
-        // The hand tool moves around with any pointer, stylus included (SPEC-drawing-tools decision 8).
+        // The hand tool moves around with any pointer, stylus included (drawing-tools spec decision 8).
         ToolCapability.NAVIGATE in toolCapabilities -> PointerRole.NAVIGATE
         isStylus(kind) || kind == PointerKind.MOUSE -> PointerRole.DRAW
         else -> when (fingerMode) {
