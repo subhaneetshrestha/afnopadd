@@ -8,6 +8,7 @@ Spec: [spec.md](spec.md). Roadmap, checkpoints and the definition of done: [docs
 | [2](#task-2-app-shell-skeleton-navigation-theme-container) | App shell skeleton (navigation, theme, container) | Done 2026-10-20 |
 | [30](#task-30-settings-about-lifecycle-hardening) | Settings, About, lifecycle hardening | In progress (part done early; see the acceptance criteria) |
 | [31](#task-31-quality-gates-adrs-release-scaffolding) | Quality gates, ADRs, release scaffolding | Not started |
+| [32](#task-32-compose-ui-tests-on-the-main-thread-v2-test-api) | Compose UI tests on the main thread (v2 test API) | In progress (CI run on the v2 rules) |
 
 ---
 
@@ -118,3 +119,32 @@ Bonus: the instrumented Room test (`SheetDatabaseTest`) passes on the API 36 emu
 - `metadata/en-US/*`, `README.md`, `app/build.gradle.kts`
 
 **Estimated scope:** Medium
+
+---
+
+## Task 32: Compose UI tests on the main thread (v2 test API)
+
+**Status:** In progress (CI run on the v2 rules)
+
+**Description:** `EditorFlowTest.aColourPickedFromThePaletteIsUsedForTheNextStroke` crashed intermittently on CI (PR #5, run 40008405910, shard 0) with `ArrayIndexOutOfBoundsException` in Compose's `SlotWriter.moveSlotGapTo` while the activity was destroyed. The test's logcat shows the cause a second after the test started: Compose applied changes on a `Dispatchers.Default` worker, raising `CalledFromWrongThreadException` ("Error was captured in composition"), which left the slot table corrupt for the later dispose. The resume path is the test framework's: a `withContext` in app code returns through the v1 rule's `ApplyingContinuationInterceptor`, which sends snapshot apply notifications on the current thread, and the v1 rules' unconfined test dispatcher runs the recomposer's frame there. The app itself runs composition on `AndroidUiDispatcher`, so users are not affected. Move every instrumented test from the deprecated v1 rules to `androidx.compose.ui.test.junit4.v2` (`StandardTestDispatcher`, composition on the main thread), and fix tests that relied on effects running eagerly.
+
+**Acceptance criteria:**
+- [ ] No instrumented test imports a rule from `androidx.compose.ui.test.junit4` outside `v2` (22 files switched).
+- [ ] Full instrumented suite green on CI, and no `CalledFromWrongThreadException` or "Error was captured in composition" in the test logcat.
+- [ ] `EditorFlowTest` passes five CI runs in a row.
+
+**Verification:**
+- [ ] Tests pass: CI instrumented shards; `.\gradlew.bat check`
+- [ ] Build succeeds: `.\gradlew.bat assembleDebug`
+- [ ] Manual check: none
+
+**Dependencies:** none
+
+**Files likely touched:**
+- `app/src/androidTest/java/...` (22 test files using `createComposeRule` or `createAndroidComposeRule`)
+
+**Estimated scope:** Small
+
+**Notes:**
+
+Found while getting the first release out of CI (2026-10-23). The re-run of the same shard passed, which fits a thread race rather than a deterministic failure.

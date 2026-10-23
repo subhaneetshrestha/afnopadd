@@ -124,6 +124,7 @@ A deep review of `be04bca..HEAD` found no critical issues, seven required change
 - [ ] Task 29: Share and receive packages ([sharing](../features/sharing/tasks.md#task-29-share-and-receive-packages))
 - [ ] Task 30: Settings, About, lifecycle hardening ([app-shell](../features/app-shell/tasks.md#task-30-settings-about-lifecycle-hardening))
 - [ ] Task 31: Quality gates, ADRs, release scaffolding ([app-shell](../features/app-shell/tasks.md#task-31-quality-gates-adrs-release-scaffolding))
+- [ ] Task 32: Compose UI tests on the main thread (v2 test API) (added 2026-10-23, found on CI; can run anytime) ([app-shell](../features/app-shell/tasks.md#task-32-compose-ui-tests-on-the-main-thread-v2-test-api))
 
 ### Checkpoint E: v1 complete
 
